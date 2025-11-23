@@ -204,26 +204,29 @@ def extract_and_analyze_emails(email_address, app_password, email_limit='all', f
                             continue
                         
                         # Process all emails in this batch
-                        # msg_data contains alternating items: (uid_info, email_data)
-                        for i in range(0, len(msg_data), 2):
-                            if i + 1 >= len(msg_data):
-                                break
+                        # msg_data is a list where each email is represented by a tuple (metadata, header_bytes)
+                        # with occasional trailing non-tuple items we can ignore
+                        for item in msg_data:
+                            # Skip non-tuple items (like closing parenthesis bytes)
+                            if not isinstance(item, tuple) or len(item) < 2:
+                                continue
                                 
                             try:
-                                # Extract UID from the response
-                                uid_info = msg_data[i]
-                                email_data = msg_data[i + 1]
+                                # Each tuple is (metadata_bytes, header_bytes)
+                                metadata = item[0]
+                                header_bytes = item[1]
                                 
-                                # Parse the UID from response
-                                uid_match = re.search(rb'UID (\d+)', uid_info) if isinstance(uid_info, bytes) else None
-                                current_uid = uid_match.group(1) if uid_match else None
+                                # Parse the UID from metadata
+                                # metadata looks like: b'123 (UID 456 BODY[HEADER] {1234}'
+                                uid_match = re.search(rb'UID (\d+)', metadata) if isinstance(metadata, bytes) else None
+                                current_uid_bytes = uid_match.group(1) if uid_match else None
                                 
-                                # Skip if we can't parse UID or no email data
-                                if not current_uid or not email_data:
+                                # Skip if we can't parse UID or no header data
+                                if not current_uid_bytes or not header_bytes:
                                     continue
                                 
                                 # Parse email headers
-                                email_message = email.message_from_bytes(email_data)
+                                email_message = email.message_from_bytes(header_bytes)
                                 
                                 # Extract basic info
                                 subject = decode_mime_words(email_message.get('Subject', ''))
@@ -243,7 +246,8 @@ def extract_and_analyze_emails(email_address, app_password, email_limit='all', f
                                 
                                 # Determine email type and category
                                 email_type = 'Spam' if folder == '[Gmail]/Spam' else 'Inbox'
-                                category = category_cache.get(current_uid.decode() if isinstance(current_uid, bytes) else current_uid, '') if folder == 'INBOX' else ''
+                                # Keep UID as bytes to match category_cache keys
+                                category = category_cache.get(current_uid_bytes, '') if folder == 'INBOX' else ''
                                 
                                 # Format date
                                 try:
