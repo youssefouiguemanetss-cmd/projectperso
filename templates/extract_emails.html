@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSS Extract Emails - Service</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .user-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .extract-form {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        
+        .results-table {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .status-pass {
+            color: #059669;
+            background-color: #d1fae5;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-fail {
+            color: #dc2626;
+            background-color: #fee2e2;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-unknown {
+            color: #d97706;
+            background-color: #fef3c7;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .email-type-inbox {
+            color: #3b82f6;
+            background-color: #dbeafe;
+        }
+        
+        .email-type-spam {
+            color: #dc2626;
+            background-color: #fee2e2;
+        }
+        
+        .email-category {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('services') }}" class="text-blue-600 hover:text-blue-800 transition-colors">
+                        <i class="fas fa-arrow-left text-lg"></i>
+                    </a>
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-search text-green-600 mr-2"></i>
+                        TSS Extract Emails
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- User Info -->
+                    <div class="user-badge text-white px-3 py-2 rounded-lg">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-user-circle"></i>
+                            <div class="text-sm">
+                                <div class="font-semibold">{{ current_user.username }}</div>
+                                <div class="text-xs opacity-90">{{ current_user.entity }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Logout Button -->
+                    <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center text-sm">
+                        <i class="fas fa-sign-out-alt mr-2"></i>
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Service Description -->
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">Email Extraction & Analysis</h2>
+            <p class="text-gray-600 max-w-3xl mx-auto">
+                Extract emails from any Gmail account and analyze their security properties including SPF, DKIM status, 
+                sender IP addresses, and categorization. Use filters to target specific emails.
+            </p>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-6 p-4 rounded-lg {% if category == 'error' %}bg-red-50 border border-red-200 text-red-700{% elif category == 'success' %}bg-green-50 border border-green-200 text-green-700{% else %}bg-blue-50 border border-blue-200 text-blue-700{% endif %}">
+                        <div class="flex items-center">
+                            <i class="fas {% if category == 'error' %}fa-exclamation-triangle{% elif category == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %} mr-2"></i>
+                            {{ message }}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Extraction Form -->
+        <div class="extract-form bg-white rounded-lg shadow-md p-8 mb-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-cog mr-2 text-green-600"></i>
+                Email Extraction Settings
+            </h3>
+            
+            <form id="extractForm" method="POST">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Email Address -->
+                    <div class="flex flex-col">
+                        <label for="email_address" class="text-sm font-semibold text-gray-700 mb-2 required">
+                            <i class="fas fa-envelope mr-2"></i>
+                            Email Address *
+                        </label>
+                        <input 
+                            type="email" 
+                            name="email_address" 
+                            id="email_address" 
+                            required
+                            placeholder="example@gmail.com"
+                            class="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                        >
+                        <p class="text-xs text-gray-500 mt-1">Gmail account to extract emails from</p>
+                    </div>
+
+                    <!-- App Password -->
+                    <div class="flex flex-col">
+                        <label for="app_password" class="text-sm font-semibold text-gray-700 mb-2 required">
+                            <i class="fas fa-key mr-2"></i>
+                            App Password *
+                        </label>
+                        <input 
+                            type="password" 
+                            name="app_password" 
+                            id="app_password" 
+                            required
+                            placeholder="xxxx xxxx xxxx xxxx"
+                            class="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                        >
+                        <p class="text-xs text-gray-500 mt-1">Gmail App Password (not regular password)</p>
+                    </div>
+                </div>
+
+                <!-- Folder Selection -->
+                <div class="mt-6">
+                    <label class="text-sm font-semibold text-gray-700 mb-3 block">
+                        <i class="fas fa-folder mr-2"></i>
+                        Email Folders
+                    </label>
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <input 
+                                type="radio" 
+                                name="folder_selection" 
+                                id="folder_all" 
+                                value="all" 
+                                checked
+                                class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
+                            >
+                            <label for="folder_all" class="ml-2 text-sm text-gray-700">
+                                All Folders (Inbox + Spam)
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input 
+                                type="radio" 
+                                name="folder_selection" 
+                                id="folder_inbox" 
+                                value="inbox"
+                                class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
+                            >
+                            <label for="folder_inbox" class="ml-2 text-sm text-gray-700">
+                                Inbox Only
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input 
+                                type="radio" 
+                                name="folder_selection" 
+                                id="folder_spam" 
+                                value="spam"
+                                class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
+                            >
+                            <label for="folder_spam" class="ml-2 text-sm text-gray-700">
+                                Spam Only
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Limit Options -->
+                <div class="mt-6">
+                    <label class="text-sm font-semibold text-gray-700 mb-3 block">
+                        <i class="fas fa-list-ol mr-2"></i>
+                        Email Limit
+                    </label>
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <input 
+                                type="radio" 
+                                name="email_limit" 
+                                id="limit_all" 
+                                value="all" 
+                                checked
+                                class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
+                            >
+                            <label for="limit_all" class="ml-2 text-sm text-gray-700">
+                                Get All Emails (No Limit)
+                            </label>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <input 
+                                type="radio" 
+                                name="email_limit" 
+                                id="limit_custom" 
+                                value="limited"
+                                class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
+                            >
+                            <label for="limit_custom" class="text-sm text-gray-700">Limited Emails:</label>
+                            <input 
+                                type="number" 
+                                name="custom_limit" 
+                                id="custom_limit" 
+                                min="1" 
+ 
+                                value="50"
+                                placeholder="50"
+                                disabled
+                                class="w-20 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            >
+                            <span class="text-xs text-gray-500">(No limit)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extract Button -->
+                <div class="mt-8 text-center">
+                    <button 
+                        type="submit" 
+                        id="extractBtn"
+                        class="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 transform hover:scale-105"
+                    >
+                        <i class="fas fa-search mr-2"></i>
+                        Extract Emails
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden text-center py-12">
+            <div class="loading-spinner inline-block w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full mb-4"></div>
+            <p class="text-gray-600 text-lg">Extracting and analyzing emails...</p>
+            <p class="text-gray-500 text-sm">This may take a few moments</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <!-- Results Header -->
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-table mr-2 text-green-600"></i>
+                    Extraction Results
+                </h3>
+                <div class="flex space-x-4">
+                    <span id="resultsCount" class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold"></span>
+                    <span id="filteredCount" class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold hidden"></span>
+                    <button 
+                        id="exportBtn"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors duration-200"
+                    >
+                        <i class="fas fa-download mr-2"></i>
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dashboard Filters -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-filter mr-2"></i>
+                    Dashboard Filters
+                </h4>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label for="filter_domain" class="text-xs font-semibold text-gray-600 mb-1">From Domain</label>
+                        <input 
+                            type="text" 
+                            id="filter_domain" 
+                            placeholder="example.com"
+                            class="px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        >
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="filter_subject" class="text-xs font-semibold text-gray-600 mb-1">Subject</label>
+                        <input 
+                            type="text" 
+                            id="filter_subject" 
+                            placeholder="Subject keywords..."
+                            class="px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="results-table bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="overflow-x-auto max-h-[750px] overflow-y-auto w-full">
+                    <table class="w-full min-w-[1200px]">
+                        <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">
+                                    <div class="flex items-center justify-between">
+                                        <span>IP Address</span>
+                                        <button 
+                                            id="copyIpBtn"
+                                            class="ml-1 bg-blue-500 hover:bg-blue-600 text-white px-1 py-1 rounded text-xs transition-colors"
+                                            title="Copy all IP addresses"
+                                        >
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
+                                    <div class="flex items-center justify-between">
+                                        <span>SPF</span>
+                                        <select id="spfFilter" class="ml-1 bg-white border border-gray-300 rounded px-1 py-1 text-xs">
+                                            <option value="All">All</option>
+                                            <option value="PASS">PASS</option>
+                                            <option value="UNKNOWN">UNKNOWN</option>
+                                        </select>
+                                    </div>
+                                </th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
+                                    <div class="flex items-center justify-between">
+                                        <span>DKIM</span>
+                                        <select id="dkimFilter" class="ml-1 bg-white border border-gray-300 rounded px-1 py-1 text-xs">
+                                            <option value="All">All</option>
+                                            <option value="PASS">PASS</option>
+                                            <option value="UNKNOWN">UNKNOWN</option>
+                                        </select>
+                                    </div>
+                                </th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
+                                    <div class="flex items-center justify-between">
+                                        <span>DMARC</span>
+                                        <select id="dmarcFilter" class="ml-1 bg-white border border-gray-300 rounded px-1 py-1 text-xs">
+                                            <option value="All">All</option>
+                                            <option value="PASS">PASS</option>
+                                            <option value="UNKNOWN">UNKNOWN</option>
+                                        </select>
+                                    </div>
+                                </th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-36">From Domain</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-80">Subject</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">
+                                    <div class="flex items-center justify-between">
+                                        <span>Type</span>
+                                        <select id="typeFilter" class="ml-1 bg-white border border-gray-300 rounded px-1 py-1 text-xs">
+                                            <option value="All">All</option>
+                                            <option value="Inbox">INBOX</option>
+                                            <option value="Spam">SPAM</option>
+                                        </select>
+                                    </div>
+                                </th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody" class="divide-y divide-gray-200">
+                            <!-- Results will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let extractedData = [];
+        let filteredData = [];
+
+        // Handle radio button changes for email limit
+        document.querySelectorAll('input[name="email_limit"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const customLimitInput = document.getElementById('custom_limit');
+                if (this.value === 'limited') {
+                    customLimitInput.disabled = false;
+                    customLimitInput.focus();
+                } else {
+                    customLimitInput.disabled = true;
+                }
+            });
+        });
+
+        document.getElementById('extractForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const extractBtn = document.getElementById('extractBtn');
+            const loadingState = document.getElementById('loadingState');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            // Show loading state
+            extractBtn.disabled = true;
+            extractBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Extracting...';
+            loadingState.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            
+            try {
+                const response = await fetch('{{ url_for("extract_emails") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    extractedData = result.data;
+                    filteredData = [...result.data]; // Copy for filtering
+                    displayResults(filteredData);
+                    updateCounts();
+                    resultsSection.classList.remove('hidden');
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error extracting emails: ' + error.message);
+            } finally {
+                // Reset button state
+                extractBtn.disabled = false;
+                extractBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Extract Emails';
+                loadingState.classList.add('hidden');
+            }
+        });
+
+        function displayResults(data) {
+            const tbody = document.getElementById('resultsTableBody');
+            tbody.innerHTML = '';
+            
+            // OPTIMIZATION: Use DocumentFragment for faster DOM manipulation
+            const fragment = document.createDocumentFragment();
+            
+            // OPTIMIZATION: Progressive loading - show first 15 emails immediately, then load rest
+            const initialLoad = data.slice(0, 15);
+            const remainingData = data.slice(15);
+            
+            // Load first 15 emails immediately
+            initialLoad.forEach(email => {
+                const row = createEmailRow(email);
+                fragment.appendChild(row);
+            });
+            
+            tbody.appendChild(fragment);
+            
+            // Load remaining emails progressively to avoid blocking UI
+            if (remainingData.length > 0) {
+                setTimeout(() => {
+                    const remainingFragment = document.createDocumentFragment();
+                    remainingData.forEach(email => {
+                        const row = createEmailRow(email);
+                        remainingFragment.appendChild(row);
+                    });
+                    tbody.appendChild(remainingFragment);
+                }, 100); // Small delay to ensure UI responsiveness
+            }
+        }
+        
+        function createEmailRow(email) {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50';
+            
+            row.innerHTML = `
+                <td class="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">${email.ip_address || 'N/A'}</td>
+                <td class="px-3 py-2 text-sm whitespace-nowrap">
+                    <span class="status-${email.spf_status.toLowerCase()}">${email.spf_status}</span>
+                </td>
+                <td class="px-3 py-2 text-sm whitespace-nowrap">
+                    <span class="status-${email.dkim_status.toLowerCase()}">${email.dkim_status}</span>
+                </td>
+                <td class="px-3 py-2 text-sm whitespace-nowrap">
+                    <span class="status-${email.dmarc_status.toLowerCase()}">${email.dmarc_status}</span>
+                </td>
+                <td class="px-3 py-2 text-sm text-gray-900 max-w-[150px] truncate" title="${email.from_domain || 'N/A'}">${email.from_domain || 'N/A'}</td>
+                <td class="px-3 py-2 text-sm text-gray-900 max-w-[300px] truncate" title="${email.subject}">${truncateText(email.subject, 60)}</td>
+                <td class="px-3 py-2 text-sm whitespace-nowrap">
+                    <span class="email-category email-type-${email.email_type.toLowerCase()}">${email.email_type}</span>
+                    ${email.category ? `<br><span class="email-category" style="background-color: #f3f4f6; color: #6b7280;">${email.category}</span>` : ''}
+                </td>
+                <td class="px-3 py-2 text-sm text-gray-500 whitespace-nowrap min-w-[120px]">${email.date}</td>
+            `;
+            
+            return row;
+        }
+
+        function updateCounts() {
+            document.getElementById('resultsCount').textContent = `${extractedData.length} total emails`;
+            const filteredCountEl = document.getElementById('filteredCount');
+            if (filteredData.length !== extractedData.length) {
+                filteredCountEl.textContent = `${filteredData.length} shown`;
+                filteredCountEl.classList.remove('hidden');
+            } else {
+                filteredCountEl.classList.add('hidden');
+            }
+        }
+
+        function applyFilters() {
+            const domainFilter = document.getElementById('filter_domain').value.toLowerCase().trim();
+            const subjectFilter = document.getElementById('filter_subject').value.toLowerCase().trim();
+            const spfFilter = document.getElementById('spfFilter').value;
+            const dkimFilter = document.getElementById('dkimFilter').value;
+            const dmarcFilter = document.getElementById('dmarcFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+
+            filteredData = extractedData.filter(email => {
+                // Domain filter
+                if (domainFilter && !email.from_domain.toLowerCase().includes(domainFilter)) {
+                    return false;
+                }
+                
+                // Subject filter
+                if (subjectFilter && !email.subject.toLowerCase().includes(subjectFilter)) {
+                    return false;
+                }
+                
+                // SPF filter
+                if (spfFilter !== 'All' && email.spf_status !== spfFilter) {
+                    return false;
+                }
+                
+                // DKIM filter
+                if (dkimFilter !== 'All' && email.dkim_status !== dkimFilter) {
+                    return false;
+                }
+                
+                // DMARC filter
+                if (dmarcFilter !== 'All' && email.dmarc_status !== dmarcFilter) {
+                    return false;
+                }
+                
+                // Type filter
+                if (typeFilter !== 'All' && email.email_type !== typeFilter) {
+                    return false;
+                }
+                
+                return true;
+            });
+
+            displayResults(filteredData);
+            updateCounts();
+        }
+
+        // Add event listeners for all filters
+        document.getElementById('filter_domain').addEventListener('input', applyFilters);
+        document.getElementById('filter_subject').addEventListener('input', applyFilters);
+        document.getElementById('spfFilter').addEventListener('change', applyFilters);
+        document.getElementById('dkimFilter').addEventListener('change', applyFilters);
+        document.getElementById('dmarcFilter').addEventListener('change', applyFilters);
+        document.getElementById('typeFilter').addEventListener('change', applyFilters);
+
+        // Copy IP addresses functionality - robust solution for web environments
+        document.getElementById('copyIpBtn').addEventListener('click', function() {
+            const ipAddresses = filteredData
+                .map(email => email.ip_address)
+                .filter(ip => ip && ip !== 'N/A')
+                .join('\n');
+            
+            if (ipAddresses) {
+                // Try modern clipboard API first, fallback to textarea method
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(ipAddresses).then(() => {
+                        showCopySuccess(this);
+                    }).catch(() => {
+                        fallbackCopyToClipboard(ipAddresses, this);
+                    });
+                } else {
+                    fallbackCopyToClipboard(ipAddresses, this);
+                }
+            } else {
+                alert('No IP addresses to copy');
+            }
+        });
+
+        function showCopySuccess(btn) {
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+            btn.classList.add('bg-green-500');
+            
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-copy"></i>';
+                btn.classList.remove('bg-green-500');
+                btn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+            }, 2000);
+        }
+
+        function fallbackCopyToClipboard(text, btn) {
+            // Create temporary textarea for fallback copy
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopySuccess(btn);
+                } else {
+                    // Last resort - show modal with text to manually copy
+                    showCopyModal(text);
+                }
+            } catch (err) {
+                showCopyModal(text);
+            } finally {
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showCopyModal(text) {
+            // Create modal for manual copying
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <h3 class="text-lg font-semibold mb-4">Copy IP Addresses</h3>
+                    <p class="text-sm text-gray-600 mb-3">Select and copy the IP addresses below:</p>
+                    <textarea readonly class="w-full h-32 p-3 border border-gray-300 rounded text-sm font-mono" onclick="this.select()">${text}</textarea>
+                    <div class="flex justify-end mt-4">
+                        <button onclick="this.closest('.fixed').remove()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function truncateText(text, maxLength) {
+            if (!text) return '';
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            exportToCSV(filteredData); // Export filtered data
+        });
+
+        function exportToCSV(data) {
+            if (data.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            const headers = ['IP Address', 'SPF Status', 'DKIM Status', 'DMARC Status', 'From Domain', 'Subject', 'Email Type', 'Category', 'Date'];
+            const csvContent = [
+                headers.join(','),
+                ...data.map(email => [
+                    email.ip_address || '',
+                    email.spf_status || '',
+                    email.dkim_status || '',
+                    email.dmarc_status || '',
+                    email.from_domain || '',
+                    `"${(email.subject || '').replace(/"/g, '""')}"`,
+                    email.email_type || '',
+                    email.category || '',
+                    email.date || ''
+                ].join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `email_extraction_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "usage_analytics": {
+    "TSS1": {
+      "login_count": 10,
+      "login_times": [
+        1757429130.796292,
+        1757429174.124664,
+        1757429197.8665304,
+        1757430807.6323078,
+        1757430827.7493527,
+        1757430855.9363084,
+        1757431896.4925961,
+        1757434481.0821085,
+        1757434508.1485422,
+        1757490964.4205194
+      ],
+      "typical_hours": [
+        16,
+        15,
+        14,
+        7
+      ],
+      "first_seen": 1757429130.7962902,
+      "last_accessed": 1757490964.1660619,
+      "account_usage": {
+        "TSS1_daenerys.targaryen.west@gmail.com": 11018,
+        "TSS1_smarout97@gmail.com": 6600,
+        "TSS1_eugenerush.rush@gmail.com": 10898,
+        "TSS1_thomas.chelbiii@gmail.com": 1213
+      }
+    }
+  },
+  "warm_pool": [],
+  "last_updated": 1757490964.4206004
+}
