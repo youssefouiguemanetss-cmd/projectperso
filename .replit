@@ -1,4 +1,4 @@
-modules = ["web", "python-3.11"]
+modules = ["python-3.11", "web", "bash"]
 run = "python app.py"
 
 [nix]
@@ -37,6 +37,10 @@ externalPort = 80
 [[ports]]
 localPort = 37395
 externalPort = 3000
+
+[[ports]]
+localPort = 39553
+externalPort = 3002
 
 [[ports]]
 localPort = 44765
