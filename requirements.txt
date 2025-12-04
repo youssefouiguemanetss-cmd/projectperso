@@ -57,3 +57,9 @@ flask-login
 flask-sqlalchemy
 gunicorn
 psycopg2-binary
+email-validator
+Flask
+Flask-Login
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
