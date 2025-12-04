@@ -1,7 +1,7 @@
 # Format: entity,Name,username,password[,permissions]
 # Permissions can be: ok, allow_add_gmail_of_news (or both separated by comma)
 TSS2,Abdelali,abdelali,TrIaOIaaq2EcLi3LLSgcdWz3,ok
-TSSW,Redouan,redouan,red123*00
+TSSW,Redouan,redouan,red123*00,allow_add_gmail_of_news
 TSSW,Y. Ouiguemane,y.ouiguemane,y.ouiguemane2234
 TSS2,M. Edraoui,M.Edraoui,vYfeg2C5SXo8lbmQ8eai4t1
 TSS2,H. Boudfa,H.BOUDFA,5C56giIhxd3L3pKkzPB5QTW
