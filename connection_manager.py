@@ -61,6 +61,7 @@ class EntityBasedGmailManager:
     def load_gmail_accounts(self):
         """Load Gmail accounts from gmailaccounts.txt file"""
         accounts = {}
+        news_accounts = {}
         try:
             with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
                 for line_num, line in enumerate(f, 1):
@@ -68,18 +69,25 @@ class EntityBasedGmailManager:
                     if line and not line.startswith('#'):
                         try:
                             parts = line.split(',')
-                            if len(parts) == 3:
+                            if len(parts) >= 3:
                                 entity = parts[0].strip().upper()
                                 email_addr = parts[1].strip()
                                 app_password = parts[2].strip()
+                                is_news = len(parts) >= 4 and parts[3].strip().lower() == 'news'
                                 
                                 account_key = f"{entity}_{email_addr}"
-                                accounts[account_key] = {
+                                account_info = {
                                     "entity": entity,
                                     "email": email_addr,
                                     "app_password": app_password,
-                                    "display_name": f"{entity} - {email_addr}"
+                                    "display_name": f"{entity} - {email_addr}",
+                                    "is_news": is_news
                                 }
+                                
+                                if is_news:
+                                    news_accounts[account_key] = account_info
+                                else:
+                                    accounts[account_key] = account_info
                             else:
                                 logging.warning(f"Invalid format in gmailaccounts.txt line {line_num}: {line}")
                         except Exception as e:
@@ -91,7 +99,24 @@ class EntityBasedGmailManager:
         
         with self.lock:
             self.all_accounts = accounts
+            self.news_accounts = news_accounts
         return accounts
+    
+    def get_news_accounts(self, user_entity):
+        """Get news Gmail accounts accessible to a user based on their entity"""
+        user_entity = user_entity.upper()
+        
+        if not hasattr(self, 'news_accounts') or not self.news_accounts:
+            self.load_gmail_accounts()
+        
+        if user_entity == 'TSSW':
+            return self.news_accounts
+        else:
+            user_news_accounts = {}
+            for key, account in self.news_accounts.items():
+                if account['entity'] == user_entity:
+                    user_news_accounts[key] = account
+            return user_news_accounts
     
     def user_login(self, user_id, user_entity):
         """Handle user login with intelligent pre-connection and analytics"""

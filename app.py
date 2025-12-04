@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import logging
 import json
 import re
+import time
 from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from connection_manager import gmail_manager
@@ -1024,6 +1025,194 @@ def get_account_status(account_key):
         return jsonify({'error': str(e)}), 500
 
 # Removed - entity-based connections don't need individual unsubscribe
+
+@app.route('/find_news')
+@login_required
+def find_news():
+    """Find News dashboard - displays news Gmail accounts"""
+    news_accounts = gmail_manager.get_news_accounts(current_user.entity)
+    return render_template('find_news.html', 
+                         accounts=news_accounts,
+                         selected_account=None)
+
+@app.route('/api/news_emails/<account_key>')
+@login_required
+def get_news_emails(account_key):
+    """Fetch last 50 inbox emails for a news account"""
+    try:
+        news_accounts = gmail_manager.get_news_accounts(current_user.entity)
+        if account_key not in news_accounts:
+            return jsonify({'error': 'Account not found or unauthorized'}), 404
+        
+        account = news_accounts[account_key]
+        emails = fetch_news_emails_fast(account['email'], account['app_password'], limit=50)
+        
+        return jsonify({
+            'success': True,
+            'emails': emails,
+            'account_key': account_key
+        })
+    except Exception as e:
+        logging.error(f"Error fetching news emails: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email_source/<account_key>/<uid>')
+@login_required
+def get_email_source(account_key, uid):
+    """Get full email source (headers, MIME parts) for copying"""
+    try:
+        news_accounts = gmail_manager.get_news_accounts(current_user.entity)
+        if account_key not in news_accounts:
+            return jsonify({'error': 'Account not found or unauthorized'}), 404
+        
+        account = news_accounts[account_key]
+        source = fetch_email_source(account['email'], account['app_password'], uid)
+        
+        if source:
+            return jsonify({
+                'success': True,
+                'source': source,
+                'uid': uid
+            })
+        else:
+            return jsonify({'error': 'Email not found'}), 404
+    except Exception as e:
+        logging.error(f"Error fetching email source: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/news_events/<account_key>')
+@login_required
+def news_events(account_key):
+    """Server-Sent Events for real-time news email updates"""
+    news_accounts = gmail_manager.get_news_accounts(current_user.entity)
+    if account_key not in news_accounts:
+        return Response("Unauthorized", status=403)
+    
+    account = news_accounts[account_key]
+    
+    def event_stream():
+        try:
+            last_check_time = 0
+            check_interval = 10  # Check every 10 seconds for new emails
+            
+            while True:
+                current_time = time.time()
+                
+                if current_time - last_check_time >= check_interval:
+                    try:
+                        emails = fetch_news_emails_fast(account['email'], account['app_password'], limit=50)
+                        yield f"data: {json.dumps({'emails': emails, 'timestamp': current_time})}\n\n"
+                        last_check_time = current_time
+                    except Exception as e:
+                        logging.error(f"Error fetching news emails in SSE: {e}")
+                        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                else:
+                    # Send heartbeat
+                    yield f"data: {json.dumps({'heartbeat': True})}\n\n"
+                
+                time.sleep(5)  # Sleep 5 seconds between checks
+                
+        except Exception as e:
+            logging.error(f"Error in news event stream: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return Response(event_stream(), mimetype='text/event-stream')
+
+def fetch_news_emails_fast(email_addr, app_password, limit=50):
+    """Fetch last N inbox emails quickly (excluding spam)"""
+    emails = []
+    mail = None
+    try:
+        mail = imaplib.IMAP4_SSL('imap.gmail.com', 993)
+        mail.login(email_addr, app_password)
+        mail.select('INBOX')
+        
+        result, data = mail.uid('SEARCH', None, 'ALL')
+        if result != 'OK' or not data[0]:
+            return emails
+        
+        email_uids = data[0].split()
+        if not email_uids:
+            return emails
+        
+        recent_uids = email_uids[-limit:]
+        recent_uids.reverse()
+        
+        for uid in recent_uids:
+            try:
+                uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
+                result, msg_data = mail.uid('fetch', uid, '(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])')
+                if result != 'OK' or not msg_data[0]:
+                    continue
+                
+                msg = email.message_from_bytes(msg_data[0][1])
+                
+                from_header = msg.get('From', '')
+                from_name, from_email_addr = email.utils.parseaddr(from_header)
+                from_name = decode_mime_words(from_name) if from_name else from_email_addr
+                
+                from_domain = ''
+                if '@' in from_email_addr:
+                    from_domain = from_email_addr.split('@')[1]
+                
+                subject = decode_mime_words(msg.get('Subject', 'No Subject'))
+                
+                date_header = msg.get('Date', '')
+                try:
+                    date_obj = email.utils.parsedate_to_datetime(date_header)
+                    date_str = date_obj.strftime('%Y-%m-%d %H:%M')
+                except:
+                    date_str = date_header[:20] if date_header else 'Unknown'
+                
+                emails.append({
+                    'uid': uid_str,
+                    'subject': subject[:100] if len(subject) > 100 else subject,
+                    'from_name': from_name[:50] if len(from_name) > 50 else from_name,
+                    'from_domain': from_domain,
+                    'date': date_str
+                })
+                
+            except Exception as e:
+                logging.debug(f"Error processing email UID {uid}: {e}")
+                continue
+                
+    except Exception as e:
+        logging.error(f"Error in fetch_news_emails_fast: {e}")
+    finally:
+        if mail:
+            try:
+                mail.logout()
+            except:
+                pass
+    
+    return emails
+
+def fetch_email_source(email_addr, app_password, uid):
+    """Fetch full email source (headers + body + MIME parts)"""
+    mail = None
+    try:
+        mail = imaplib.IMAP4_SSL('imap.gmail.com', 993)
+        mail.login(email_addr, app_password)
+        mail.select('INBOX')
+        
+        result, msg_data = mail.uid('fetch', uid, '(RFC822)')
+        if result != 'OK' or not msg_data[0]:
+            return None
+        
+        raw_email = msg_data[0][1]
+        if isinstance(raw_email, bytes):
+            return raw_email.decode('utf-8', errors='replace')
+        return str(raw_email)
+        
+    except Exception as e:
+        logging.error(f"Error fetching email source: {e}")
+        return None
+    finally:
+        if mail:
+            try:
+                mail.logout()
+            except:
+                pass
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -7,3 +7,4 @@
 [x] 7. Migration completed successfully - TSS Extract Emails app is running on Replit
 [x] 8. Fixed gunicorn dependency installation for Replit environment
 [x] 9. Optimized TSS Extract Emails service - reduced extraction time from 120+ seconds to 5-10 seconds using batch processing
+[x] 10. Added "Find News" service - displays news Gmail accounts with last 50 inbox emails and copy source functionality

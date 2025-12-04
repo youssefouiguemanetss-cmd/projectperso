@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSS - Find News</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .user-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .email-row {
+            transition: all 0.2s ease;
+        }
+        .email-row:hover {
+            background-color: #f3f4f6;
+        }
+        .copy-btn {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .email-row:hover .copy-btn {
+            opacity: 1;
+        }
+        .account-card {
+            transition: all 0.2s ease;
+        }
+        .account-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .account-card.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .toast {
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .auto-refresh-indicator {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('dashboard') }}" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-newspaper text-green-600 mr-2"></i>
+                        Find News
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="user-badge text-white px-3 py-2 rounded-lg">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-user-circle"></i>
+                            <div class="text-sm">
+                                <div class="font-semibold">{{ current_user.username }}</div>
+                                <div class="text-xs opacity-90">{{ current_user.entity }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <div class="flex gap-6">
+            <div class="w-80 flex-shrink-0">
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
+                        <i class="fas fa-envelope mr-2 text-green-500"></i>
+                        News Accounts
+                    </h3>
+                    
+                    {% if accounts %}
+                        <div class="space-y-3" id="accounts-list">
+                            {% for key, account in accounts.items() %}
+                                <div class="account-card border border-gray-200 rounded-lg p-3 cursor-pointer" 
+                                     data-account="{{ key }}"
+                                     onclick="selectAccount('{{ key }}')">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold
+                                            {% if account.entity == 'TSS1' %}bg-blue-500
+                                            {% elif account.entity == 'TSS2' %}bg-green-500
+                                            {% elif account.entity == 'TSS3' %}bg-yellow-500
+                                            {% elif account.entity == 'TSSF' %}bg-orange-500
+                                            {% elif account.entity == 'TSSW' %}bg-red-500
+                                            {% else %}bg-gray-500{% endif %}">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="font-semibold text-gray-800 text-sm">{{ account.entity }}</div>
+                                            <div class="text-xs text-gray-600 truncate">{{ account.email }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-3"></i>
+                            <p>No news accounts available</p>
+                            <p class="text-xs mt-2">Add ",news" to accounts in gmailaccounts.txt</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex-1">
+                <div id="welcome-screen" class="bg-white rounded-lg shadow-md p-8 text-center">
+                    <i class="fas fa-newspaper text-gray-300 text-6xl mb-4"></i>
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Select a News Account</h2>
+                    <p class="text-gray-500">Choose an account from the left to view the latest emails</p>
+                </div>
+
+                <div id="emails-section" class="hidden">
+                    <div class="bg-white rounded-lg shadow-md">
+                        <div class="border-b border-gray-200 px-4 py-3 flex justify-between items-center">
+                            <div class="flex items-center space-x-3">
+                                <h4 class="font-semibold text-gray-800" id="account-title">Emails</h4>
+                                <span class="text-sm text-gray-500" id="email-count">(0 emails)</span>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <div id="auto-refresh-status" class="flex items-center text-sm text-green-600">
+                                    <span class="auto-refresh-indicator w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                    Auto-refresh active
+                                </div>
+                                <button onclick="refreshEmails()" class="text-blue-600 hover:text-blue-800 text-sm">
+                                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="emails-loading" class="hidden py-12 text-center">
+                            <i class="fas fa-spinner loading-spinner text-blue-500 text-3xl mb-3"></i>
+                            <p class="text-gray-500">Loading emails...</p>
+                        </div>
+
+                        <div id="emails-list" class="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+                        </div>
+
+                        <div id="no-emails" class="hidden py-12 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-3"></i>
+                            <p>No emails found</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg hidden toast">
+        <i class="fas fa-check mr-2"></i>
+        <span id="toast-message">Source copied!</span>
+    </div>
+
+    <div id="source-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] m-4">
+            <div class="border-b border-gray-200 px-4 py-3 flex justify-between items-center">
+                <h3 class="font-semibold text-gray-800">Email Source</h3>
+                <div class="flex items-center space-x-2">
+                    <button onclick="copySourceFromModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-copy mr-1"></i>Copy All
+                    </button>
+                    <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 overflow-auto max-h-[calc(80vh-60px)]">
+                <pre id="source-content" class="text-xs bg-gray-50 p-4 rounded overflow-x-auto whitespace-pre-wrap font-mono"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedAccount = null;
+        let eventSource = null;
+        let currentEmails = [];
+
+        function selectAccount(accountKey) {
+            document.querySelectorAll('.account-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-account="${accountKey}"]`).classList.add('selected');
+            
+            selectedAccount = accountKey;
+            
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('emails-section').classList.remove('hidden');
+            
+            const accountCard = document.querySelector(`[data-account="${accountKey}"]`);
+            const entityName = accountCard.querySelector('.font-semibold').textContent;
+            const emailAddr = accountCard.querySelector('.truncate').textContent;
+            document.getElementById('account-title').textContent = `${entityName} - ${emailAddr}`;
+            
+            startEventStream(accountKey);
+            fetchEmails(accountKey);
+        }
+
+        function startEventStream(accountKey) {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource(`/news_events/${accountKey}`);
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.emails && !data.heartbeat) {
+                        updateEmailsList(data.emails);
+                    }
+                } catch (e) {
+                    console.error('Error parsing SSE data:', e);
+                }
+            };
+
+            eventSource.onerror = function() {
+                document.getElementById('auto-refresh-status').innerHTML = 
+                    '<span class="text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>Connection lost</span>';
+                setTimeout(() => {
+                    if (selectedAccount) {
+                        startEventStream(selectedAccount);
+                    }
+                }, 5000);
+            };
+
+            eventSource.onopen = function() {
+                document.getElementById('auto-refresh-status').innerHTML = 
+                    '<span class="auto-refresh-indicator w-2 h-2 bg-green-500 rounded-full mr-2"></span>Auto-refresh active';
+            };
+        }
+
+        async function fetchEmails(accountKey) {
+            document.getElementById('emails-loading').classList.remove('hidden');
+            document.getElementById('emails-list').classList.add('hidden');
+            document.getElementById('no-emails').classList.add('hidden');
+
+            try {
+                const response = await fetch(`/api/news_emails/${accountKey}`);
+                const data = await response.json();
+                
+                document.getElementById('emails-loading').classList.add('hidden');
+                
+                if (data.success && data.emails) {
+                    updateEmailsList(data.emails);
+                } else {
+                    document.getElementById('no-emails').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error fetching emails:', error);
+                document.getElementById('emails-loading').classList.add('hidden');
+                document.getElementById('no-emails').classList.remove('hidden');
+            }
+        }
+
+        function refreshEmails() {
+            if (selectedAccount) {
+                fetchEmails(selectedAccount);
+            }
+        }
+
+        function updateEmailsList(emails) {
+            currentEmails = emails;
+            const container = document.getElementById('emails-list');
+            const noEmails = document.getElementById('no-emails');
+            
+            document.getElementById('email-count').textContent = `(${emails.length} emails)`;
+            
+            if (!emails || emails.length === 0) {
+                container.classList.add('hidden');
+                noEmails.classList.remove('hidden');
+                return;
+            }
+            
+            container.classList.remove('hidden');
+            noEmails.classList.add('hidden');
+            
+            container.innerHTML = emails.map((email, index) => `
+                <div class="email-row px-4 py-3 flex items-center justify-between">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="flex items-center space-x-3 mb-1">
+                            <span class="font-medium text-gray-800 truncate">${escapeHtml(email.from_name)}</span>
+                            <span class="text-xs text-gray-400">@${escapeHtml(email.from_domain)}</span>
+                        </div>
+                        <div class="text-sm text-gray-600 truncate">${escapeHtml(email.subject)}</div>
+                        <div class="text-xs text-gray-400 mt-1">${escapeHtml(email.date)}</div>
+                    </div>
+                    <button onclick="copySource('${email.uid}')" 
+                            class="copy-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm whitespace-nowrap">
+                        <i class="fas fa-copy mr-1"></i>Copy Source
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function copySource(uid) {
+            if (!selectedAccount) return;
+            
+            try {
+                const btn = event.target.closest('button');
+                const originalContent = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner loading-spinner"></i>';
+                btn.disabled = true;
+
+                const response = await fetch(`/api/email_source/${selectedAccount}/${uid}`);
+                const data = await response.json();
+                
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+
+                if (data.success && data.source) {
+                    await navigator.clipboard.writeText(data.source);
+                    showToast('Source copied to clipboard!');
+                } else {
+                    showToast('Failed to get email source', true);
+                }
+            } catch (error) {
+                console.error('Error copying source:', error);
+                showToast('Error copying source', true);
+            }
+        }
+
+        async function viewSource(uid) {
+            if (!selectedAccount) return;
+            
+            try {
+                const response = await fetch(`/api/email_source/${selectedAccount}/${uid}`);
+                const data = await response.json();
+                
+                if (data.success && data.source) {
+                    document.getElementById('source-content').textContent = data.source;
+                    document.getElementById('source-modal').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error viewing source:', error);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('source-modal').classList.add('hidden');
+        }
+
+        async function copySourceFromModal() {
+            const source = document.getElementById('source-content').textContent;
+            await navigator.clipboard.writeText(source);
+            showToast('Source copied to clipboard!');
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg toast ${isError ? 'bg-red-500' : 'bg-green-500'} text-white`;
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        document.getElementById('source-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>
