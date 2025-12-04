@@ -92,8 +92,21 @@ Visual identification in Gmail account dropdown menu:
 - **TSSW**: Red (bg-gradient-to-br from-red-500 to-red-600)
 
 ## Authentication Files
-- **users.txt**: Format: `Entity,Username,Password` (one per line)
-- **gmailaccounts.txt**: Format: `Entity,EmailAddress,AppPassword` (one per line)
+- **users.txt**: Format: `Entity,Name,Username,Password[,permissions]` (one per line)
+  - Permissions can include: `ok` (toggle permissions), `allow_add_gmail_of_news` (manage news accounts)
+  - Multiple permissions separated by comma
+- **gmailaccounts.txt**: Format: `Entity,EmailAddress,AppPassword[,news]` (one per line)
+  - Add `,news` suffix to mark accounts for the "Find News" service
+
+## Recent Changes (December 2025)
+### User Profile and Permission System (December 4, 2025)
+- ✅ Updated users.txt format to include Name field: `entity,Name,username,password[,permissions]`
+- ✅ Personalized user experience now displays Name in welcome messages and navigation bars
+- ✅ Added permission system supporting multiple permissions per user (ok, allow_add_gmail_of_news)
+- ✅ Moved "Find News" service to services page for easier access and organization
+- ✅ Implemented full Gmail account management for "Find News" service (add/edit/delete)
+- ✅ Permission-based account management: TSSW users can manage all entities, others limited to their own
+- ✅ Enhanced security with entity-scoped authorization for account modifications
 
 ## Recent Changes (August 2025)
 ### Multi-Service Platform Implementation (August 26, 2025)
