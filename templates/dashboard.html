@@ -113,17 +113,17 @@
                     </h1>
                 </div>
                 <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                    <!-- Find News Button -->
-                    <a href="{{ url_for('find_news') }}" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center text-sm">
-                        <i class="fas fa-newspaper mr-2"></i>
-                        Find News
+                    <!-- Back to Services -->
+                    <a href="{{ url_for('services') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center text-sm">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Services
                     </a>
                     <!-- User Info -->
                     <div class="user-badge text-white px-3 py-2 rounded-lg">
                         <div class="flex items-center space-x-2">
                             <i class="fas fa-user-circle"></i>
                             <div class="text-sm">
-                                <div class="font-semibold">{{ current_user.username }}</div>
+                                <div class="font-semibold">{{ current_user.name }}</div>
                                 <div class="text-xs opacity-90">{{ current_user.entity }}</div>
                             </div>
                         </div>
@@ -142,7 +142,7 @@
         <!-- Welcome Section -->
         <div class="text-center mb-8">
             <h2 class="text-3xl font-bold text-gray-800 mb-2">
-                Welcome, {{ current_user.username }}!
+                Welcome, {{ current_user.name }}!
             </h2>
             <p class="text-gray-600">
                 Access and manage your 

@@ -33,43 +33,55 @@ login_manager.login_message_category = 'info'
 
 # User class for Flask-Login
 class User(UserMixin):
-    def __init__(self, username, entity, has_toggle_permission=False):
+    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False):
         self.id = username
         self.username = username
         self.entity = entity
+        self.name = name or username
         self.has_toggle_permission = has_toggle_permission
+        self.has_news_permission = has_news_permission
 
 @login_manager.user_loader
 def load_user(user_id):
     """Load user from session"""
     users = load_users_from_file()
     for user_data in users:
-        entity, username, password = user_data[:3]
-        has_permission = len(user_data) > 3 and user_data[3] == 'ok'
+        entity = user_data['entity']
+        name = user_data['name']
+        username = user_data['username']
+        has_toggle = user_data['has_toggle_permission']
+        has_news = user_data['has_news_permission']
         if username == user_id:
-            return User(username, entity, has_permission)
+            return User(username, entity, name, has_toggle, has_news)
     return None
 
 def load_users_from_file():
-    """Load users from users.txt file with optional permission flags"""
+    """Load users from users.txt file with new format: entity,Name,username,password[,permissions]"""
     users = []
     try:
         with open('users.txt', 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
-                if line and not line.startswith('#'):  # Skip empty lines and comments
+                if line and not line.startswith('#'):
                     try:
                         parts = line.split(',')
-                        if len(parts) >= 3:
+                        if len(parts) >= 4:
                             entity = parts[0].strip()
-                            username = parts[1].strip()
-                            password = parts[2].strip()
-                            # Check for optional permission flag
-                            permission = parts[3].strip() if len(parts) > 3 else None
-                            if permission:
-                                users.append((entity, username, password, permission))
-                            else:
-                                users.append((entity, username, password))
+                            name = parts[1].strip()
+                            username = parts[2].strip()
+                            password = parts[3].strip()
+                            permissions = [p.strip() for p in parts[4:]] if len(parts) > 4 else []
+                            has_toggle = 'ok' in permissions
+                            has_news = 'allow_add_gmail_of_news' in permissions
+                            users.append({
+                                'entity': entity,
+                                'name': name,
+                                'username': username,
+                                'password': password,
+                                'permissions': permissions,
+                                'has_toggle_permission': has_toggle,
+                                'has_news_permission': has_news
+                            })
                         else:
                             logging.warning(f"Invalid format in users.txt line {line_num}: {line}")
                     except Exception as e:
@@ -81,19 +93,16 @@ def load_users_from_file():
     
     return users
 
-# Removed - now handled by EntityBasedGmailManager
-
 def get_user_accounts(user_entity):
     """Get Gmail accounts accessible to a user based on their entity"""
     return gmail_manager.get_user_accounts(user_entity)
 
 def authenticate_user(username, password):
-    """Authenticate user against users.txt file"""
+    """Authenticate user against users.txt file and return user data dict"""
     users = load_users_from_file()
     for user_data in users:
-        entity, stored_username, stored_password = user_data[:3]
-        if stored_username == username and stored_password == password:
-            return entity
+        if user_data['username'] == username and user_data['password'] == password:
+            return user_data
     return None
 
 def connect_to_gmail(email_addr, password):
@@ -682,18 +691,15 @@ def login():
             return render_template('login.html')
         
         # Authenticate user
-        user_entity = authenticate_user(username, password)
-        if user_entity:
-            # Check if user has toggle permissions
-            users = load_users_from_file()
-            has_permission = False
-            for user_data in users:
-                if user_data[1] == username:  # Match username
-                    has_permission = len(user_data) > 3 and user_data[3] == 'ok'
-                    break
+        user_data = authenticate_user(username, password)
+        if user_data:
+            user_entity = user_data['entity']
+            user_name = user_data['name']
+            has_toggle = user_data['has_toggle_permission']
+            has_news = user_data['has_news_permission']
             
-            user = User(username, user_entity, has_permission)
-            login_user(user, remember=True)  # Remember user login
+            user = User(username, user_entity, user_name, has_toggle, has_news)
+            login_user(user, remember=True)
             
             # Notify connection manager about user login (independent of login success)
             try:
@@ -701,11 +707,10 @@ def login():
                 logging.info(f"Gmail connections activated for user {username} ({user_entity})")
             except Exception as e:
                 logging.warning(f"Gmail connection manager failed during login for {username}: {e}")
-                # Login still succeeds even if Gmail connections fail
             
-            flash(f'Welcome {username}! You are logged in as {user_entity}.', 'success')
+            flash(f'Welcome, {user_name}!', 'success')
             
-            # Redirect to next page if requested, otherwise dashboard
+            # Redirect to next page if requested, otherwise services
             next_page = request.args.get('next')
             if next_page:
                 return redirect(next_page)
@@ -1031,9 +1036,196 @@ def get_account_status(account_key):
 def find_news():
     """Find News dashboard - displays news Gmail accounts"""
     news_accounts = gmail_manager.get_news_accounts(current_user.entity)
+    
+    # Get list of entities for TSSW users (they can add accounts to any entity)
+    entities = []
+    if current_user.entity.upper() == 'TSSW':
+        entities = ['TSS1', 'TSS2', 'TSS3', 'TSSF', 'TSSW']
+    
     return render_template('find_news.html', 
                          accounts=news_accounts,
-                         selected_account=None)
+                         selected_account=None,
+                         can_manage_news=current_user.has_news_permission,
+                         entities=entities,
+                         user_entity=current_user.entity.upper())
+
+def load_news_accounts_for_management(user_entity):
+    """Load news accounts that a user can manage (from their entity or all if TSSW)"""
+    accounts = []
+    try:
+        with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    parts = line.split(',')
+                    if len(parts) >= 4 and parts[3].strip().lower() == 'news':
+                        entity = parts[0].strip().upper()
+                        email_addr = parts[1].strip()
+                        app_password = parts[2].strip()
+                        
+                        # TSSW can see all, others only their entity
+                        if user_entity.upper() == 'TSSW' or entity == user_entity.upper():
+                            accounts.append({
+                                'entity': entity,
+                                'email': email_addr,
+                                'app_password': app_password,
+                                'line_num': line_num
+                            })
+    except FileNotFoundError:
+        logging.error("gmailaccounts.txt file not found")
+    except Exception as e:
+        logging.error(f"Error reading gmailaccounts.txt: {e}")
+    return accounts
+
+def save_news_account(entity, email, app_password):
+    """Add a new news Gmail account to gmailaccounts.txt"""
+    try:
+        with open('gmailaccounts.txt', 'a', encoding='utf-8') as f:
+            f.write(f"\n{entity},{email},{app_password},news")
+        gmail_manager.load_gmail_accounts()
+        return True
+    except Exception as e:
+        logging.error(f"Error saving news account: {e}")
+        return False
+
+def update_news_account(old_entity, old_email, new_entity, new_email, new_password):
+    """Update an existing news Gmail account in gmailaccounts.txt"""
+    try:
+        lines = []
+        found = False
+        with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    parts = stripped.split(',')
+                    if len(parts) >= 4 and parts[3].strip().lower() == 'news':
+                        if parts[0].strip().upper() == old_entity.upper() and parts[1].strip() == old_email:
+                            lines.append(f"{new_entity},{new_email},{new_password},news\n")
+                            found = True
+                            continue
+                lines.append(line if line.endswith('\n') else line + '\n')
+        
+        if found:
+            with open('gmailaccounts.txt', 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            gmail_manager.load_gmail_accounts()
+        return found
+    except Exception as e:
+        logging.error(f"Error updating news account: {e}")
+        return False
+
+def delete_news_account(entity, email):
+    """Delete a news Gmail account from gmailaccounts.txt"""
+    try:
+        lines = []
+        found = False
+        with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    parts = stripped.split(',')
+                    if len(parts) >= 4 and parts[3].strip().lower() == 'news':
+                        if parts[0].strip().upper() == entity.upper() and parts[1].strip() == email:
+                            found = True
+                            continue
+                lines.append(line if line.endswith('\n') else line + '\n')
+        
+        if found:
+            with open('gmailaccounts.txt', 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            gmail_manager.load_gmail_accounts()
+        return found
+    except Exception as e:
+        logging.error(f"Error deleting news account: {e}")
+        return False
+
+@app.route('/api/news_accounts', methods=['GET'])
+@login_required
+def get_manageable_news_accounts():
+    """Get news accounts that the current user can manage"""
+    if not current_user.has_news_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    accounts = load_news_accounts_for_management(current_user.entity)
+    return jsonify({'success': True, 'accounts': accounts})
+
+@app.route('/api/news_accounts', methods=['POST'])
+@login_required
+def add_news_account():
+    """Add a new news Gmail account"""
+    if not current_user.has_news_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    entity = data.get('entity', '').strip().upper()
+    email = data.get('email', '').strip()
+    app_password = data.get('app_password', '').strip()
+    
+    if not entity or not email or not app_password:
+        return jsonify({'error': 'All fields are required'}), 400
+    
+    # Non-TSSW users can only add to their own entity
+    if current_user.entity.upper() != 'TSSW' and entity != current_user.entity.upper():
+        return jsonify({'error': 'You can only add accounts to your own entity'}), 403
+    
+    # Validate email format
+    if '@' not in email or '.' not in email:
+        return jsonify({'error': 'Invalid email format'}), 400
+    
+    if save_news_account(entity, email, app_password):
+        return jsonify({'success': True, 'message': 'Account added successfully'})
+    else:
+        return jsonify({'error': 'Failed to add account'}), 500
+
+@app.route('/api/news_accounts', methods=['PUT'])
+@login_required
+def update_news_account_route():
+    """Update an existing news Gmail account"""
+    if not current_user.has_news_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    old_entity = data.get('old_entity', '').strip().upper()
+    old_email = data.get('old_email', '').strip()
+    new_entity = data.get('entity', '').strip().upper()
+    new_email = data.get('email', '').strip()
+    new_password = data.get('app_password', '').strip()
+    
+    if not all([old_entity, old_email, new_entity, new_email, new_password]):
+        return jsonify({'error': 'All fields are required'}), 400
+    
+    # Check permissions
+    if current_user.entity.upper() != 'TSSW':
+        if old_entity != current_user.entity.upper() or new_entity != current_user.entity.upper():
+            return jsonify({'error': 'You can only modify accounts in your own entity'}), 403
+    
+    if update_news_account(old_entity, old_email, new_entity, new_email, new_password):
+        return jsonify({'success': True, 'message': 'Account updated successfully'})
+    else:
+        return jsonify({'error': 'Account not found or update failed'}), 404
+
+@app.route('/api/news_accounts', methods=['DELETE'])
+@login_required
+def delete_news_account_route():
+    """Delete a news Gmail account"""
+    if not current_user.has_news_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    entity = data.get('entity', '').strip().upper()
+    email = data.get('email', '').strip()
+    
+    if not entity or not email:
+        return jsonify({'error': 'Entity and email are required'}), 400
+    
+    # Check permissions
+    if current_user.entity.upper() != 'TSSW' and entity != current_user.entity.upper():
+        return jsonify({'error': 'You can only delete accounts from your own entity'}), 403
+    
+    if delete_news_account(entity, email):
+        return jsonify({'success': True, 'message': 'Account deleted successfully'})
+    else:
+        return jsonify({'error': 'Account not found or delete failed'}), 404
 
 @app.route('/api/news_emails/<account_key>')
 @login_required

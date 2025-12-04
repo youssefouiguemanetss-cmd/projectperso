@@ -28,6 +28,10 @@
         .extract-icon {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
+        
+        .news-icon {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -47,7 +51,7 @@
                         <div class="flex items-center space-x-2">
                             <i class="fas fa-user-circle"></i>
                             <div class="text-sm">
-                                <div class="font-semibold">{{ current_user.username }}</div>
+                                <div class="font-semibold">{{ current_user.name }}</div>
                                 <div class="text-xs opacity-90">{{ current_user.entity }}</div>
                             </div>
                         </div>
@@ -66,7 +70,7 @@
         <!-- Welcome Section -->
         <div class="text-center mb-12">
             <h2 class="text-4xl font-bold text-gray-800 mb-4">
-                Welcome, {{ current_user.username }}!
+                Welcome, {{ current_user.name }}!
             </h2>
             <p class="text-lg text-gray-600 max-w-2xl mx-auto">
                 Choose from our powerful email management services designed for your {{ current_user.entity }} entity.
@@ -89,7 +93,7 @@
         {% endwith %}
 
         <!-- Services Grid -->
-        <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div class="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             <!-- TSS Gmail Access Service -->
             <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
                  onclick="window.location.href='{{ url_for('dashboard') }}'">
@@ -178,6 +182,52 @@
                     <div class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition-colors duration-200 font-semibold">
                         <i class="fas fa-arrow-right mr-2"></i>
                         Extract Emails
+                    </div>
+                </div>
+            </div>
+
+            <!-- Find News Service -->
+            <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
+                 onclick="window.location.href='{{ url_for('find_news') }}'">
+                <div class="text-center">
+                    <!-- Service Icon -->
+                    <div class="news-icon w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-newspaper text-white text-2xl"></i>
+                    </div>
+                    
+                    <!-- Service Title -->
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Find News</h3>
+                    
+                    <!-- Service Description -->
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Access news Gmail accounts and view the last 50 inbox emails. 
+                        Copy email source directly for quick analysis.
+                    </p>
+                    
+                    <!-- Features List -->
+                    <div class="text-left space-y-2 mb-6">
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            News accounts from all entities
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Last 50 inbox emails display
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Copy source functionality
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Auto-refresh updates
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-lg transition-colors duration-200 font-semibold">
+                        <i class="fas fa-arrow-right mr-2"></i>
+                        Find News
                     </div>
                 </div>
             </div>
