@@ -1,0 +1,70 @@
+I got this python app, is working good ans nicely, i want from you just to add new service that called "Records domain check"
+The new service will have redirect from service page like other serivce, the main idea of this service is like that:
+
+When the user login and go to this service he will he have the ability to check the domain records (dmarc,spf,a records,txt record, mx record), for each record it will be special to work:
+For dmarc records:
+The user will have the ability to past all the domain that he have line by line, or just upload txt file, when he do that, the app must check when he click on the button of check if the domain have the dmarc records, it will display a table of all domain with there dmarc records, if they have it, if not, the domain will have dmarc not found message, in the same time, it will display input text, let the user to entre form of dmarc how he want to make it for the domains that have not dmarc record, for example if the user put this "txtvalue":
+v=DMARC1; p=reject; rua=mailto:postmaster@[domain]; ruf=mailto:dmarc@[domain]; fo=1; pct=100
+
+And click on download, that means you will give him txt file that have in each line like this
+[domain],_dmarc.[domain],TXT,txtvalue
+And you will replace [domain] with all domain that have not dmarc records.
+Of course the process to get dmarc records must be fast, as same as genaret txt file or read txt files, and of course you should handle the possible erreur that the user may do
+
+For spf records:
+Required features & behavior:
+Input fields:
+Textarea for Domain Names (one domain per line)
+Text field for Subdomain Prefix (e.g., "mail" → becomes mail.example.com; if left blank, uses the root domain)
+Textarea for IP Address List (accepts IPs one per line, or separated by spaces/semicolons/newlines)
+Toggle switch: "Separate IPs Equally per Domain"
+When OFF (default): All domains get the exact same full list of IPs in their SPF record
+When ON: All IPs are distributed as evenly as possible across the domains (some domains get +1 IP if not perfectly divisible)
+Output format (exactly this CSV-like structure, one line per domain)
+textdomain.com,mail.domain.com,TXT,v=spf1 ip4:1.2.3.4 ip4:5.6.7.8 -all
+First column: root domain
+Second column: subdomain (or root if prefix empty)
+Third column: always TXT
+Fourth column: full SPF record ending with -all
+Validation & smart warnings:
+Show red error if domains or IPs are missing/invalid
+When "Separate IPs" is ON → error if fewer IPs than domains
+Yellow warning when IPs are distributed unevenly (shows how many get +1)
+Warning if >50 IPs when using "same IPs for all" mode (common DNS limit)
+
+
+For a records:
+
+Required features & exact behavior:
+
+Input fields:
+Textarea: Domain Names (one domain per line)
+Single text input: Subdomain Prefix → e.g., "dns" → becomes dns.example.com (this field is required — no blank allowed)
+Large textarea: IP Address List (accepts IPs one per line, or separated by spaces, semicolons, commas, or newlines)
+
+Output format (exactly this, one line per domain):textexample.com,dns.example.com,TXT,Arecords:1.2.3.4;5.6.7.8;9.10.11.12
+Column 1: root domain
+Column 2: [subdomain-prefix].[domain]
+Column 3: always TXT
+Column 4: Arecords: followed by all IPs joined with semicolons (;) — no spaces
+
+Key functionality:
+All IPs from the list are used identically for every domain (same list for all)
+Automatically removes duplicate IPs
+Ignores invalid/non-IP entries
+Shows a visible warning box (red/yellow) when more than 50 IPs are entered (common DNS provider limit)
+Error in output if any field is missing or no valid IPs found
+
+
+And for mx records and txt records, just bring the records of domain given, or display message not found, if there is not
+
+
+UI/UX requirements:
+Clean, professional design (modern cards, good spacing)
+Use Tailwind CSS (preferred) or similar lightweight framework
+Mobile-responsive
+"Generate" button + "Copy to Clipboard" button with success toast/pop-up
+Output textarea should be readonly with dashed border and monospace font
+Pre-fill with example data on page load (like the current tool does)
+
+Before you start updating on my app, if you didn't understand something or you want to clarify something, feel free to ask me, in order to make sure you understand what i want
