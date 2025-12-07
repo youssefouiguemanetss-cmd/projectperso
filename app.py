@@ -1169,18 +1169,18 @@ def load_extraction_accounts():
         logging.error(f"Error reading gmailaccounts.txt: {e}")
     return accounts
 
-def save_extraction_account(entity, email, app_password):
+def save_extraction_account(email, app_password):
     """Add a new extraction Gmail account to gmailaccounts.txt"""
     try:
         with open('gmailaccounts.txt', 'a', encoding='utf-8') as f:
-            f.write(f"\n{entity},{email},{app_password},allow_extraction")
+            f.write(f"\nEXTRACTION,{email},{app_password},allow_extraction")
         gmail_manager.load_gmail_accounts()
         return True
     except Exception as e:
         logging.error(f"Error saving extraction account: {e}")
         return False
 
-def update_extraction_account(old_entity, old_email, new_entity, new_email, new_password):
+def update_extraction_account(old_email, new_email, new_password):
     """Update an existing extraction Gmail account in gmailaccounts.txt"""
     try:
         lines = []
@@ -1191,8 +1191,9 @@ def update_extraction_account(old_entity, old_email, new_entity, new_email, new_
                 if stripped and not stripped.startswith('#'):
                     parts = stripped.split(',')
                     if len(parts) >= 4 and parts[3].strip().lower() == 'allow_extraction':
-                        if parts[0].strip().upper() == old_entity.upper() and parts[1].strip() == old_email:
-                            lines.append(f"{new_entity},{new_email},{new_password},allow_extraction\n")
+                        if parts[1].strip() == old_email:
+                            entity = parts[0].strip()
+                            lines.append(f"{entity},{new_email},{new_password},allow_extraction\n")
                             found = True
                             continue
                 lines.append(line if line.endswith('\n') else line + '\n')
@@ -1206,7 +1207,7 @@ def update_extraction_account(old_entity, old_email, new_entity, new_email, new_
         logging.error(f"Error updating extraction account: {e}")
         return False
 
-def delete_extraction_account(entity, email):
+def delete_extraction_account(email):
     """Delete an extraction Gmail account from gmailaccounts.txt"""
     try:
         lines = []
@@ -1217,7 +1218,7 @@ def delete_extraction_account(entity, email):
                 if stripped and not stripped.startswith('#'):
                     parts = stripped.split(',')
                     if len(parts) >= 4 and parts[3].strip().lower() == 'allow_extraction':
-                        if parts[0].strip().upper() == entity.upper() and parts[1].strip() == email:
+                        if parts[1].strip() == email:
                             found = True
                             continue
                 lines.append(line if line.endswith('\n') else line + '\n')
@@ -1249,17 +1250,16 @@ def add_extraction_account():
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
-    entity = data.get('entity', '').strip().upper()
     email = data.get('email', '').strip()
     app_password = data.get('app_password', '').strip()
     
-    if not entity or not email or not app_password:
-        return jsonify({'error': 'All fields are required'}), 400
+    if not email or not app_password:
+        return jsonify({'error': 'Email and app password are required'}), 400
     
     if '@' not in email or '.' not in email:
         return jsonify({'error': 'Invalid email format'}), 400
     
-    if save_extraction_account(entity, email, app_password):
+    if save_extraction_account(email, app_password):
         return jsonify({'success': True, 'message': 'Account added successfully'})
     else:
         return jsonify({'error': 'Failed to add account'}), 500
@@ -1272,16 +1272,14 @@ def update_extraction_account_route():
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
-    old_entity = data.get('old_entity', '').strip().upper()
     old_email = data.get('old_email', '').strip()
-    new_entity = data.get('entity', '').strip().upper()
     new_email = data.get('email', '').strip()
     new_password = data.get('app_password', '').strip()
     
-    if not all([old_entity, old_email, new_entity, new_email, new_password]):
+    if not all([old_email, new_email, new_password]):
         return jsonify({'error': 'All fields are required'}), 400
     
-    if update_extraction_account(old_entity, old_email, new_entity, new_email, new_password):
+    if update_extraction_account(old_email, new_email, new_password):
         return jsonify({'success': True, 'message': 'Account updated successfully'})
     else:
         return jsonify({'error': 'Account not found or update failed'}), 404
@@ -1294,13 +1292,12 @@ def delete_extraction_account_route():
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
-    entity = data.get('entity', '').strip().upper()
     email = data.get('email', '').strip()
     
-    if not entity or not email:
-        return jsonify({'error': 'Entity and email are required'}), 400
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
     
-    if delete_extraction_account(entity, email):
+    if delete_extraction_account(email):
         return jsonify({'success': True, 'message': 'Account deleted successfully'})
     else:
         return jsonify({'error': 'Account not found or delete failed'}), 404

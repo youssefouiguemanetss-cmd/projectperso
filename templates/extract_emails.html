@@ -777,7 +777,7 @@
             extractionAccounts.forEach((account, index) => {
                 const option = document.createElement('option');
                 option.value = index;
-                option.textContent = `${account.entity} - ${account.email}`;
+                option.textContent = account.email;
                 select.appendChild(option);
             });
         }
@@ -796,7 +796,7 @@
             const account = extractionAccounts[parseInt(index)];
             if (account) {
                 document.getElementById('email_address').value = account.email;
-                document.getElementById('app_password').value = account.password;
+                document.getElementById('app_password').value = account.app_password;
             }
         }
 
@@ -814,7 +814,6 @@
 
         // Clear the add account form
         function clearAddAccountForm() {
-            document.getElementById('newAccountEntity').value = '';
             document.getElementById('newAccountEmail').value = '';
             document.getElementById('newAccountPassword').value = '';
         }
@@ -839,10 +838,16 @@
                 <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-purple-300 transition-colors" data-index="${index}">
                     <div class="flex-1">
                         <div class="flex items-center space-x-2">
-                            <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-semibold">${escapeHtml(account.entity)}</span>
+                            <i class="fas fa-envelope text-purple-600"></i>
                             <span class="text-gray-800 font-medium">${escapeHtml(account.email)}</span>
                         </div>
-                        <div class="text-xs text-gray-500 mt-1">Password: ${'*'.repeat(8)}</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            <span>Password: </span>
+                            <span id="pwd-display-${index}" class="font-mono">${'*'.repeat(8)}</span>
+                            <button onclick="togglePasswordVisibility(${index}, '${escapeHtml(account.app_password)}')" class="ml-2 text-purple-600 hover:text-purple-800">
+                                <i id="pwd-icon-${index}" class="fas fa-eye text-xs"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="flex items-center space-x-2">
                         <button onclick="openEditExtractionModal(${index})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm transition-colors">
@@ -863,13 +868,63 @@
             return div.innerHTML;
         }
 
+        // Toggle password visibility in accounts list
+        let passwordVisibility = {};
+        function togglePasswordVisibility(index, password) {
+            const display = document.getElementById(`pwd-display-${index}`);
+            const icon = document.getElementById(`pwd-icon-${index}`);
+            
+            if (passwordVisibility[index]) {
+                display.textContent = '********';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+                passwordVisibility[index] = false;
+            } else {
+                display.textContent = password;
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+                passwordVisibility[index] = true;
+            }
+        }
+
+        // Toggle password visibility for new account form
+        function toggleNewPasswordVisibility() {
+            const input = document.getElementById('newAccountPassword');
+            const icon = document.getElementById('newPwdIcon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        // Toggle password visibility for edit account form
+        function toggleEditPasswordVisibility() {
+            const input = document.getElementById('editAccountPassword');
+            const icon = document.getElementById('editPwdIcon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
         // Add new extraction account
         async function addExtractionAccount() {
-            const entity = document.getElementById('newAccountEntity').value.trim();
             const email = document.getElementById('newAccountEmail').value.trim();
             const app_password = document.getElementById('newAccountPassword').value.trim();
             
-            if (!entity || !email || !app_password) {
+            if (!email || !app_password) {
                 showExtractionToast('Please fill in all fields', 'error');
                 return;
             }
@@ -878,7 +933,7 @@
                 const response = await fetch('/api/extraction_accounts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ entity, email, app_password })
+                    body: JSON.stringify({ email, app_password })
                 });
                 
                 const result = await response.json();
@@ -902,11 +957,9 @@
             if (!account) return;
             
             document.getElementById('editAccountIndex').value = index;
-            document.getElementById('editAccountOldEntity').value = account.entity;
             document.getElementById('editAccountOldEmail').value = account.email;
-            document.getElementById('editAccountEntity').value = account.entity;
             document.getElementById('editAccountEmail').value = account.email;
-            document.getElementById('editAccountPassword').value = account.password;
+            document.getElementById('editAccountPassword').value = account.app_password;
             
             document.getElementById('editExtractionModal').classList.remove('hidden');
         }
@@ -919,13 +972,11 @@
         // Save edited account
         async function saveEditExtractionAccount() {
             const index = document.getElementById('editAccountIndex').value;
-            const old_entity = document.getElementById('editAccountOldEntity').value;
             const old_email = document.getElementById('editAccountOldEmail').value;
-            const entity = document.getElementById('editAccountEntity').value.trim();
             const email = document.getElementById('editAccountEmail').value.trim();
             const app_password = document.getElementById('editAccountPassword').value.trim();
             
-            if (!entity || !email || !app_password) {
+            if (!email || !app_password) {
                 showExtractionToast('Please fill in all fields', 'error');
                 return;
             }
@@ -934,7 +985,7 @@
                 const response = await fetch('/api/extraction_accounts', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ old_entity, old_email, entity, email, app_password })
+                    body: JSON.stringify({ old_email, email, app_password })
                 });
                 
                 const result = await response.json();
@@ -957,7 +1008,7 @@
             const account = extractionAccounts[index];
             if (!account) return;
             
-            if (!confirm(`Are you sure you want to delete the account for ${account.entity} (${account.email})?`)) {
+            if (!confirm(`Are you sure you want to delete the account ${account.email}?`)) {
                 return;
             }
             
@@ -965,7 +1016,7 @@
                 const response = await fetch('/api/extraction_accounts', {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ entity: account.entity, email: account.email })
+                    body: JSON.stringify({ email: account.email })
                 });
                 
                 const result = await response.json();
@@ -1026,18 +1077,19 @@
                     <i class="fas fa-plus-circle mr-2 text-green-600"></i>
                     Add New Account
                 </h4>
-                <div class="grid md:grid-cols-3 gap-3">
+                <div class="grid md:grid-cols-2 gap-3">
                     <div>
-                        <label class="text-xs text-gray-600 block mb-1">Entity Name</label>
-                        <input type="text" id="newAccountEntity" placeholder="e.g. TSSW" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
-                    </div>
-                    <div>
-                        <label class="text-xs text-gray-600 block mb-1">Email Address</label>
+                        <label class="text-xs text-gray-600 block mb-1">Gmail Address</label>
                         <input type="email" id="newAccountEmail" placeholder="email@gmail.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
                     </div>
                     <div>
                         <label class="text-xs text-gray-600 block mb-1">App Password</label>
-                        <input type="password" id="newAccountPassword" placeholder="xxxx xxxx xxxx xxxx" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
+                        <div class="relative">
+                            <input type="password" id="newAccountPassword" placeholder="xxxx xxxx xxxx xxxx" class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
+                            <button type="button" onclick="toggleNewPasswordVisibility()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-purple-600">
+                                <i id="newPwdIcon" class="fas fa-eye text-sm"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-3 flex justify-end">
@@ -1073,7 +1125,6 @@
     <div id="editExtractionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
             <input type="hidden" id="editAccountIndex">
-            <input type="hidden" id="editAccountOldEntity">
             <input type="hidden" id="editAccountOldEmail">
             
             <!-- Modal Header -->
@@ -1092,16 +1143,17 @@
             <!-- Edit Form -->
             <div class="p-6 space-y-4">
                 <div>
-                    <label class="text-sm font-semibold text-gray-700 block mb-1">Entity Name</label>
-                    <input type="text" id="editAccountEntity" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="text-sm font-semibold text-gray-700 block mb-1">Email Address</label>
+                    <label class="text-sm font-semibold text-gray-700 block mb-1">Gmail Address</label>
                     <input type="email" id="editAccountEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
                     <label class="text-sm font-semibold text-gray-700 block mb-1">App Password</label>
-                    <input type="password" id="editAccountPassword" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <div class="relative">
+                        <input type="password" id="editAccountPassword" class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <button type="button" onclick="toggleEditPasswordVisibility()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-600">
+                            <i id="editPwdIcon" class="fas fa-eye text-sm"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             
