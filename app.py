@@ -1411,17 +1411,32 @@ def fetch_email_source(email_addr, app_password, uid):
             except:
                 pass
 
+def get_dns_resolver():
+    """Get a configured DNS resolver with timeout and reliable nameservers"""
+    resolver = dns.resolver.Resolver()
+    resolver.timeout = 5
+    resolver.lifetime = 10
+    resolver.nameservers = ['8.8.8.8', '8.8.4.4', '1.1.1.1']
+    return resolver
+
 def lookup_dmarc(domain):
     """Lookup DMARC record for a domain"""
     try:
+        resolver = get_dns_resolver()
         dmarc_domain = f"_dmarc.{domain}"
-        answers = dns.resolver.resolve(dmarc_domain, 'TXT')
+        answers = resolver.resolve(dmarc_domain, 'TXT')
         for rdata in answers:
-            txt_value = str(rdata).strip('"')
+            txt_parts = []
+            for s in rdata.strings:
+                if isinstance(s, bytes):
+                    txt_parts.append(s.decode('utf-8', errors='replace'))
+                else:
+                    txt_parts.append(str(s))
+            txt_value = ''.join(txt_parts)
             if txt_value.lower().startswith('v=dmarc1'):
                 return txt_value
         return None
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.Timeout):
         return None
     except Exception as e:
         logging.debug(f"DMARC lookup error for {domain}: {e}")
@@ -1430,12 +1445,13 @@ def lookup_dmarc(domain):
 def lookup_mx(domain):
     """Lookup MX records for a domain"""
     try:
-        answers = dns.resolver.resolve(domain, 'MX')
+        resolver = get_dns_resolver()
+        answers = resolver.resolve(domain, 'MX')
         mx_records = []
         for rdata in answers:
             mx_records.append(f"{rdata.preference} {rdata.exchange}")
         return mx_records
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.Timeout):
         return None
     except Exception as e:
         logging.debug(f"MX lookup error for {domain}: {e}")
@@ -1444,12 +1460,19 @@ def lookup_mx(domain):
 def lookup_txt(domain):
     """Lookup TXT records for a domain"""
     try:
-        answers = dns.resolver.resolve(domain, 'TXT')
+        resolver = get_dns_resolver()
+        answers = resolver.resolve(domain, 'TXT')
         txt_records = []
         for rdata in answers:
-            txt_records.append(str(rdata).strip('"'))
+            txt_parts = []
+            for s in rdata.strings:
+                if isinstance(s, bytes):
+                    txt_parts.append(s.decode('utf-8', errors='replace'))
+                else:
+                    txt_parts.append(str(s))
+            txt_records.append(''.join(txt_parts))
         return txt_records
-    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.Timeout):
         return None
     except Exception as e:
         logging.debug(f"TXT lookup error for {domain}: {e}")
