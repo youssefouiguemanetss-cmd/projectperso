@@ -33,13 +33,14 @@ login_manager.login_message_category = 'info'
 
 # User class for Flask-Login
 class User(UserMixin):
-    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False):
+    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False):
         self.id = username
         self.username = username
         self.entity = entity
         self.name = name or username
         self.has_toggle_permission = has_toggle_permission
         self.has_news_permission = has_news_permission
+        self.has_domain_checker_permission = has_domain_checker_permission
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -51,8 +52,9 @@ def load_user(user_id):
         username = user_data['username']
         has_toggle = user_data['has_toggle_permission']
         has_news = user_data['has_news_permission']
+        has_domain_checker = user_data['has_domain_checker_permission']
         if username == user_id:
-            return User(username, entity, name, has_toggle, has_news)
+            return User(username, entity, name, has_toggle, has_news, has_domain_checker)
     return None
 
 def load_users_from_file():
@@ -73,6 +75,7 @@ def load_users_from_file():
                             permissions = [p.strip() for p in parts[4:]] if len(parts) > 4 else []
                             has_toggle = 'ok' in permissions
                             has_news = 'allow_add_gmail_of_news' in permissions
+                            has_domain_checker = 'Domain_checker' in permissions
                             users.append({
                                 'entity': entity,
                                 'name': name,
@@ -80,7 +83,8 @@ def load_users_from_file():
                                 'password': password,
                                 'permissions': permissions,
                                 'has_toggle_permission': has_toggle,
-                                'has_news_permission': has_news
+                                'has_news_permission': has_news,
+                                'has_domain_checker_permission': has_domain_checker
                             })
                         else:
                             logging.warning(f"Invalid format in users.txt line {line_num}: {line}")
