@@ -1144,6 +1144,167 @@ def delete_news_account(entity, email):
         logging.error(f"Error deleting news account: {e}")
         return False
 
+def load_extraction_accounts():
+    """Load Gmail accounts with allow_extraction flag for TSSW users"""
+    accounts = []
+    try:
+        with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    parts = line.split(',')
+                    if len(parts) >= 4 and parts[3].strip().lower() == 'allow_extraction':
+                        entity = parts[0].strip().upper()
+                        email_addr = parts[1].strip()
+                        app_password = parts[2].strip()
+                        accounts.append({
+                            'entity': entity,
+                            'email': email_addr,
+                            'app_password': app_password,
+                            'line_num': line_num
+                        })
+    except FileNotFoundError:
+        logging.error("gmailaccounts.txt file not found")
+    except Exception as e:
+        logging.error(f"Error reading gmailaccounts.txt: {e}")
+    return accounts
+
+def save_extraction_account(entity, email, app_password):
+    """Add a new extraction Gmail account to gmailaccounts.txt"""
+    try:
+        with open('gmailaccounts.txt', 'a', encoding='utf-8') as f:
+            f.write(f"\n{entity},{email},{app_password},allow_extraction")
+        gmail_manager.load_gmail_accounts()
+        return True
+    except Exception as e:
+        logging.error(f"Error saving extraction account: {e}")
+        return False
+
+def update_extraction_account(old_entity, old_email, new_entity, new_email, new_password):
+    """Update an existing extraction Gmail account in gmailaccounts.txt"""
+    try:
+        lines = []
+        found = False
+        with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    parts = stripped.split(',')
+                    if len(parts) >= 4 and parts[3].strip().lower() == 'allow_extraction':
+                        if parts[0].strip().upper() == old_entity.upper() and parts[1].strip() == old_email:
+                            lines.append(f"{new_entity},{new_email},{new_password},allow_extraction\n")
+                            found = True
+                            continue
+                lines.append(line if line.endswith('\n') else line + '\n')
+        
+        if found:
+            with open('gmailaccounts.txt', 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            gmail_manager.load_gmail_accounts()
+        return found
+    except Exception as e:
+        logging.error(f"Error updating extraction account: {e}")
+        return False
+
+def delete_extraction_account(entity, email):
+    """Delete an extraction Gmail account from gmailaccounts.txt"""
+    try:
+        lines = []
+        found = False
+        with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    parts = stripped.split(',')
+                    if len(parts) >= 4 and parts[3].strip().lower() == 'allow_extraction':
+                        if parts[0].strip().upper() == entity.upper() and parts[1].strip() == email:
+                            found = True
+                            continue
+                lines.append(line if line.endswith('\n') else line + '\n')
+        
+        if found:
+            with open('gmailaccounts.txt', 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            gmail_manager.load_gmail_accounts()
+        return found
+    except Exception as e:
+        logging.error(f"Error deleting extraction account: {e}")
+        return False
+
+@app.route('/api/extraction_accounts', methods=['GET'])
+@login_required
+def get_extraction_accounts():
+    """Get extraction accounts for TSSW users"""
+    if current_user.entity.upper() != 'TSSW':
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    accounts = load_extraction_accounts()
+    return jsonify({'success': True, 'accounts': accounts})
+
+@app.route('/api/extraction_accounts', methods=['POST'])
+@login_required
+def add_extraction_account():
+    """Add a new extraction Gmail account"""
+    if current_user.entity.upper() != 'TSSW':
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    entity = data.get('entity', '').strip().upper()
+    email = data.get('email', '').strip()
+    app_password = data.get('app_password', '').strip()
+    
+    if not entity or not email or not app_password:
+        return jsonify({'error': 'All fields are required'}), 400
+    
+    if '@' not in email or '.' not in email:
+        return jsonify({'error': 'Invalid email format'}), 400
+    
+    if save_extraction_account(entity, email, app_password):
+        return jsonify({'success': True, 'message': 'Account added successfully'})
+    else:
+        return jsonify({'error': 'Failed to add account'}), 500
+
+@app.route('/api/extraction_accounts', methods=['PUT'])
+@login_required
+def update_extraction_account_route():
+    """Update an existing extraction Gmail account"""
+    if current_user.entity.upper() != 'TSSW':
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    old_entity = data.get('old_entity', '').strip().upper()
+    old_email = data.get('old_email', '').strip()
+    new_entity = data.get('entity', '').strip().upper()
+    new_email = data.get('email', '').strip()
+    new_password = data.get('app_password', '').strip()
+    
+    if not all([old_entity, old_email, new_entity, new_email, new_password]):
+        return jsonify({'error': 'All fields are required'}), 400
+    
+    if update_extraction_account(old_entity, old_email, new_entity, new_email, new_password):
+        return jsonify({'success': True, 'message': 'Account updated successfully'})
+    else:
+        return jsonify({'error': 'Account not found or update failed'}), 404
+
+@app.route('/api/extraction_accounts', methods=['DELETE'])
+@login_required
+def delete_extraction_account_route():
+    """Delete an extraction Gmail account"""
+    if current_user.entity.upper() != 'TSSW':
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    entity = data.get('entity', '').strip().upper()
+    email = data.get('email', '').strip()
+    
+    if not entity or not email:
+        return jsonify({'error': 'Entity and email are required'}), 400
+    
+    if delete_extraction_account(entity, email):
+        return jsonify({'success': True, 'message': 'Account deleted successfully'})
+    else:
+        return jsonify({'error': 'Account not found or delete failed'}), 404
+
 @app.route('/api/news_accounts', methods=['GET'])
 @login_required
 def get_manageable_news_accounts():
@@ -1316,7 +1477,7 @@ def news_events(account_key):
     return Response(event_stream(), mimetype='text/event-stream')
 
 def fetch_news_emails_fast(email_addr, app_password, limit=50):
-    """Fetch last N inbox emails quickly (excluding spam)"""
+    """Fetch last N inbox emails quickly (excluding spam) with Gmail folder/category info"""
     emails = []
     mail = None
     try:
@@ -1334,6 +1495,19 @@ def fetch_news_emails_fast(email_addr, app_password, limit=50):
         
         recent_uids = email_uids[-limit:]
         recent_uids.reverse()
+        
+        category_cache = {}
+        categories = ['social', 'promotions', 'updates', 'forums']
+        for cat_key in categories:
+            try:
+                result_cat, data_cat = mail.uid('search', 'X-GM-RAW', f'"category:{cat_key}"')
+                if result_cat == 'OK' and data_cat[0]:
+                    cat_uids = set(data_cat[0].split())
+                    for uid in recent_uids:
+                        if uid in cat_uids:
+                            category_cache[uid] = cat_key.capitalize()
+            except Exception as e:
+                logging.debug(f"Error caching category {cat_key}: {e}")
         
         for uid in recent_uids:
             try:
@@ -1361,12 +1535,15 @@ def fetch_news_emails_fast(email_addr, app_password, limit=50):
                 except:
                     date_str = date_header[:20] if date_header else 'Unknown'
                 
+                folder = category_cache.get(uid, 'Primary')
+                
                 emails.append({
                     'uid': uid_str,
                     'subject': subject[:100] if len(subject) > 100 else subject,
                     'from_name': from_name[:50] if len(from_name) > 50 else from_name,
                     'from_domain': from_domain,
-                    'date': date_str
+                    'date': date_str,
+                    'folder': folder
                 })
                 
             except Exception as e:

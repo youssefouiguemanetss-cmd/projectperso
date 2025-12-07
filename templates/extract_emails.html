@@ -135,12 +135,34 @@
 
         <!-- Extraction Form -->
         <div class="extract-form bg-white rounded-lg shadow-md p-8 mb-8">
-            <h3 class="text-xl font-bold text-gray-800 mb-6">
-                <i class="fas fa-cog mr-2 text-green-600"></i>
-                Email Extraction Settings
-            </h3>
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-cog mr-2 text-green-600"></i>
+                    Email Extraction Settings
+                </h3>
+                {% if current_user.entity.upper() == 'TSSW' %}
+                <button type="button" onclick="openManageExtractionModal()" class="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-lg transition-all">
+                    <i class="fas fa-cog"></i>
+                    <span>Manage Accounts</span>
+                </button>
+                {% endif %}
+            </div>
             
             <form id="extractForm" method="POST">
+                {% if current_user.entity.upper() == 'TSSW' %}
+                <!-- Saved Accounts Dropdown for TSSW users -->
+                <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+                    <label class="text-sm font-semibold text-gray-700 mb-2 block">
+                        <i class="fas fa-bookmark mr-2 text-purple-600"></i>
+                        Quick Select - Saved Extraction Accounts
+                    </label>
+                    <select id="savedAccountSelect" onchange="fillFromSavedAccount()" class="w-full px-4 py-3 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 bg-white">
+                        <option value="">-- Select a saved account or enter manually below --</option>
+                    </select>
+                    <p class="text-xs text-purple-600 mt-1">Select a saved account to auto-fill the credentials below</p>
+                </div>
+                {% endif %}
+
                 <div class="grid md:grid-cols-2 gap-6">
                     <!-- Email Address -->
                     <div class="flex flex-col">

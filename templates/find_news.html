@@ -28,11 +28,35 @@
             transform: translateX(4px);
         }
         .copy-btn {
-            opacity: 0;
             transition: all 0.2s ease;
         }
-        .email-row:hover .copy-btn {
-            opacity: 1;
+        .folder-badge {
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .folder-primary {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #1e40af;
+        }
+        .folder-promotions {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+        }
+        .folder-social {
+            background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+            color: #9d174d;
+        }
+        .folder-updates {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+        .folder-forums {
+            background: linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%);
+            color: #6b21a8;
         }
         .account-card {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -532,6 +556,7 @@
                         <div class="flex items-center space-x-3 mb-1">
                             <span class="font-semibold text-gray-800">${escapeHtml(email.from_name)}</span>
                             <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">@${escapeHtml(email.from_domain)}</span>
+                            <span class="folder-badge folder-${(email.folder || 'primary').toLowerCase()}">${escapeHtml(email.folder || 'Primary')}</span>
                         </div>
                         <div class="text-sm text-gray-600 truncate">${escapeHtml(email.subject)}</div>
                         <div class="text-xs text-gray-400 mt-1 flex items-center">
