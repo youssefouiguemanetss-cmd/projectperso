@@ -735,6 +735,388 @@
             link.click();
             document.body.removeChild(link);
         }
+
+        // ==========================================
+        // EXTRACTION ACCOUNTS MANAGEMENT (TSSW Only)
+        // ==========================================
+        let extractionAccounts = [];
+
+        // Load extraction accounts on page load (if TSSW user)
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedAccountSelect = document.getElementById('savedAccountSelect');
+            if (savedAccountSelect) {
+                loadExtractionAccounts();
+            }
+        });
+
+        // Load extraction accounts from API
+        async function loadExtractionAccounts() {
+            try {
+                const response = await fetch('/api/extraction_accounts');
+                const result = await response.json();
+                
+                if (result.success) {
+                    extractionAccounts = result.accounts;
+                    populateAccountsDropdown();
+                    populateAccountsList();
+                }
+            } catch (error) {
+                console.error('Error loading extraction accounts:', error);
+                showExtractionToast('Failed to load saved accounts', 'error');
+            }
+        }
+
+        // Populate the dropdown with saved accounts
+        function populateAccountsDropdown() {
+            const select = document.getElementById('savedAccountSelect');
+            if (!select) return;
+            
+            // Clear existing options except first
+            select.innerHTML = '<option value="">-- Select a saved account or enter manually below --</option>';
+            
+            extractionAccounts.forEach((account, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${account.entity} - ${account.email}`;
+                select.appendChild(option);
+            });
+        }
+
+        // Fill form from selected saved account
+        function fillFromSavedAccount() {
+            const select = document.getElementById('savedAccountSelect');
+            const index = select.value;
+            
+            if (index === '') {
+                document.getElementById('email_address').value = '';
+                document.getElementById('app_password').value = '';
+                return;
+            }
+            
+            const account = extractionAccounts[parseInt(index)];
+            if (account) {
+                document.getElementById('email_address').value = account.email;
+                document.getElementById('app_password').value = account.password;
+            }
+        }
+
+        // Open the manage accounts modal
+        function openManageExtractionModal() {
+            document.getElementById('extractionAccountsModal').classList.remove('hidden');
+            loadExtractionAccounts();
+        }
+
+        // Close the manage accounts modal
+        function closeManageExtractionModal() {
+            document.getElementById('extractionAccountsModal').classList.add('hidden');
+            clearAddAccountForm();
+        }
+
+        // Clear the add account form
+        function clearAddAccountForm() {
+            document.getElementById('newAccountEntity').value = '';
+            document.getElementById('newAccountEmail').value = '';
+            document.getElementById('newAccountPassword').value = '';
+        }
+
+        // Populate the accounts list in modal
+        function populateAccountsList() {
+            const container = document.getElementById('accountsList');
+            if (!container) return;
+            
+            if (extractionAccounts.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-inbox text-4xl mb-3"></i>
+                        <p>No extraction accounts saved yet</p>
+                        <p class="text-sm">Add your first account using the form above</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = extractionAccounts.map((account, index) => `
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-purple-300 transition-colors" data-index="${index}">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-semibold">${escapeHtml(account.entity)}</span>
+                            <span class="text-gray-800 font-medium">${escapeHtml(account.email)}</span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">Password: ${'*'.repeat(8)}</div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="openEditExtractionModal(${index})" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm transition-colors">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteExtractionAccount(${index})" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-sm transition-colors">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Add new extraction account
+        async function addExtractionAccount() {
+            const entity = document.getElementById('newAccountEntity').value.trim();
+            const email = document.getElementById('newAccountEmail').value.trim();
+            const app_password = document.getElementById('newAccountPassword').value.trim();
+            
+            if (!entity || !email || !app_password) {
+                showExtractionToast('Please fill in all fields', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/extraction_accounts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entity, email, app_password })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showExtractionToast('Account added successfully', 'success');
+                    clearAddAccountForm();
+                    loadExtractionAccounts();
+                } else {
+                    showExtractionToast(result.error || 'Failed to add account', 'error');
+                }
+            } catch (error) {
+                showExtractionToast('Error adding account', 'error');
+                console.error(error);
+            }
+        }
+
+        // Open edit modal for an account
+        function openEditExtractionModal(index) {
+            const account = extractionAccounts[index];
+            if (!account) return;
+            
+            document.getElementById('editAccountIndex').value = index;
+            document.getElementById('editAccountOldEntity').value = account.entity;
+            document.getElementById('editAccountOldEmail').value = account.email;
+            document.getElementById('editAccountEntity').value = account.entity;
+            document.getElementById('editAccountEmail').value = account.email;
+            document.getElementById('editAccountPassword').value = account.password;
+            
+            document.getElementById('editExtractionModal').classList.remove('hidden');
+        }
+
+        // Close edit modal
+        function closeEditExtractionModal() {
+            document.getElementById('editExtractionModal').classList.add('hidden');
+        }
+
+        // Save edited account
+        async function saveEditExtractionAccount() {
+            const index = document.getElementById('editAccountIndex').value;
+            const old_entity = document.getElementById('editAccountOldEntity').value;
+            const old_email = document.getElementById('editAccountOldEmail').value;
+            const entity = document.getElementById('editAccountEntity').value.trim();
+            const email = document.getElementById('editAccountEmail').value.trim();
+            const app_password = document.getElementById('editAccountPassword').value.trim();
+            
+            if (!entity || !email || !app_password) {
+                showExtractionToast('Please fill in all fields', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/extraction_accounts', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_entity, old_email, entity, email, app_password })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showExtractionToast('Account updated successfully', 'success');
+                    closeEditExtractionModal();
+                    loadExtractionAccounts();
+                } else {
+                    showExtractionToast(result.error || 'Failed to update account', 'error');
+                }
+            } catch (error) {
+                showExtractionToast('Error updating account', 'error');
+                console.error(error);
+            }
+        }
+
+        // Delete extraction account
+        async function deleteExtractionAccount(index) {
+            const account = extractionAccounts[index];
+            if (!account) return;
+            
+            if (!confirm(`Are you sure you want to delete the account for ${account.entity} (${account.email})?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/extraction_accounts', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ entity: account.entity, email: account.email })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showExtractionToast('Account deleted successfully', 'success');
+                    loadExtractionAccounts();
+                } else {
+                    showExtractionToast(result.error || 'Failed to delete account', 'error');
+                }
+            } catch (error) {
+                showExtractionToast('Error deleting account', 'error');
+                console.error(error);
+            }
+        }
+
+        // Show toast notification
+        function showExtractionToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300 ${
+                type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`;
+            toast.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
     </script>
+
+    <!-- Manage Extraction Accounts Modal -->
+    <div id="extractionAccountsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold flex items-center">
+                        <i class="fas fa-cog mr-2"></i>
+                        Manage Extraction Accounts
+                    </h3>
+                    <button onclick="closeManageExtractionModal()" class="text-white hover:text-gray-200 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <p class="text-purple-100 text-sm mt-1">Add, edit or remove Gmail accounts for email extraction</p>
+            </div>
+            
+            <!-- Add New Account Form -->
+            <div class="p-6 border-b border-gray-200 bg-gray-50">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-plus-circle mr-2 text-green-600"></i>
+                    Add New Account
+                </h4>
+                <div class="grid md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-600 block mb-1">Entity Name</label>
+                        <input type="text" id="newAccountEntity" placeholder="e.g. TSSW" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-600 block mb-1">Email Address</label>
+                        <input type="email" id="newAccountEmail" placeholder="email@gmail.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-600 block mb-1">App Password</label>
+                        <input type="password" id="newAccountPassword" placeholder="xxxx xxxx xxxx xxxx" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm">
+                    </div>
+                </div>
+                <div class="mt-3 flex justify-end">
+                    <button onclick="addExtractionAccount()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Add Account
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Accounts List -->
+            <div class="p-6 overflow-y-auto max-h-[40vh]">
+                <h4 class="text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-list mr-2 text-purple-600"></i>
+                    Saved Accounts
+                </h4>
+                <div id="accountsList" class="space-y-3">
+                    <!-- Accounts will be populated here -->
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                <div class="flex justify-end">
+                    <button onclick="closeManageExtractionModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Account Modal -->
+    <div id="editExtractionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <input type="hidden" id="editAccountIndex">
+            <input type="hidden" id="editAccountOldEntity">
+            <input type="hidden" id="editAccountOldEmail">
+            
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-4 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold flex items-center">
+                        <i class="fas fa-edit mr-2"></i>
+                        Edit Account
+                    </h3>
+                    <button onclick="closeEditExtractionModal()" class="text-white hover:text-gray-200 text-xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Edit Form -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 block mb-1">Entity Name</label>
+                    <input type="text" id="editAccountEntity" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 block mb-1">Email Address</label>
+                    <input type="email" id="editAccountEmail" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 block mb-1">App Password</label>
+                    <input type="password" id="editAccountPassword" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="bg-gray-50 px-6 py-4 rounded-b-xl border-t border-gray-200">
+                <div class="flex justify-end space-x-3">
+                    <button onclick="closeEditExtractionModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="saveEditExtractionAccount()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-save mr-2"></i>Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
