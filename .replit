@@ -7,7 +7,7 @@ packages = ["openssl", "postgresql"]
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["sh", "-c", "python app.py"]
+run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
 
 [workflows]
 runButton = "Project"
@@ -30,17 +30,20 @@ task = "shell.exec"
 args = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
 waitForPort = 5000
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 33231
-externalPort = 3002
-
-[[ports]]
 localPort = 37395
 externalPort = 3000
+
+[[ports]]
+localPort = 37419
+externalPort = 3002
 
 [[ports]]
 localPort = 38411
