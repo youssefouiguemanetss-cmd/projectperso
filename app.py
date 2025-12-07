@@ -8,6 +8,7 @@ import logging
 import json
 import re
 import time
+import dns.resolver
 from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from connection_manager import gmail_manager
@@ -1409,6 +1410,246 @@ def fetch_email_source(email_addr, app_password, uid):
                 mail.logout()
             except:
                 pass
+
+def lookup_dmarc(domain):
+    """Lookup DMARC record for a domain"""
+    try:
+        dmarc_domain = f"_dmarc.{domain}"
+        answers = dns.resolver.resolve(dmarc_domain, 'TXT')
+        for rdata in answers:
+            txt_value = str(rdata).strip('"')
+            if txt_value.lower().startswith('v=dmarc1'):
+                return txt_value
+        return None
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+        return None
+    except Exception as e:
+        logging.debug(f"DMARC lookup error for {domain}: {e}")
+        return None
+
+def lookup_mx(domain):
+    """Lookup MX records for a domain"""
+    try:
+        answers = dns.resolver.resolve(domain, 'MX')
+        mx_records = []
+        for rdata in answers:
+            mx_records.append(f"{rdata.preference} {rdata.exchange}")
+        return mx_records
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+        return None
+    except Exception as e:
+        logging.debug(f"MX lookup error for {domain}: {e}")
+        return None
+
+def lookup_txt(domain):
+    """Lookup TXT records for a domain"""
+    try:
+        answers = dns.resolver.resolve(domain, 'TXT')
+        txt_records = []
+        for rdata in answers:
+            txt_records.append(str(rdata).strip('"'))
+        return txt_records
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+        return None
+    except Exception as e:
+        logging.debug(f"TXT lookup error for {domain}: {e}")
+        return None
+
+def is_valid_ip(ip):
+    """Check if a string is a valid IPv4 address"""
+    pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    if not re.match(pattern, ip):
+        return False
+    parts = ip.split('.')
+    return all(0 <= int(part) <= 255 for part in parts)
+
+@app.route('/domain_checker')
+@login_required
+def domain_checker():
+    """Domain checker service - DNS lookup tools"""
+    if not current_user.has_domain_checker_permission:
+        flash('You do not have permission to access the Domain Checker service.', 'error')
+        return redirect(url_for('services'))
+    return render_template('domain_checker.html')
+
+@app.route('/api/domain_checker/dmarc', methods=['POST'])
+@login_required
+def api_dmarc_lookup():
+    """API endpoint for DMARC lookups"""
+    if not current_user.has_domain_checker_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    domains_text = data.get('domains', '')
+    
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    results = []
+    for domain in domains:
+        dmarc_record = lookup_dmarc(domain)
+        results.append({
+            'domain': domain,
+            'dmarc': dmarc_record if dmarc_record else 'Not Found'
+        })
+    
+    return jsonify({'results': results})
+
+@app.route('/api/domain_checker/dmarc_download', methods=['POST'])
+@login_required
+def api_dmarc_download():
+    """Generate download file for domains missing DMARC records"""
+    if not current_user.has_domain_checker_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    domains_text = data.get('domains', '')
+    template = data.get('template', 'v=DMARC1; p=reject; rua=mailto:postmaster@[domain]; ruf=mailto:dmarc@[domain]; fo=1; pct=100')
+    
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    lines = []
+    for domain in domains:
+        dmarc_record = lookup_dmarc(domain)
+        if not dmarc_record:
+            txt_value = template.replace('[domain]', domain)
+            lines.append(f"{domain},_dmarc.{domain},TXT,{txt_value}")
+    
+    return jsonify({'content': '\n'.join(lines), 'count': len(lines)})
+
+@app.route('/api/domain_checker/spf_generate', methods=['POST'])
+@login_required
+def api_spf_generate():
+    """Generate SPF records"""
+    if not current_user.has_domain_checker_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    domains_text = data.get('domains', '')
+    subdomain = data.get('subdomain', '').strip()
+    ips_text = data.get('ips', '')
+    distribute = data.get('distribute', False)
+    
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    ips = [ip.strip() for ip in ips_text.strip().split('\n') if ip.strip() and is_valid_ip(ip.strip())]
+    
+    if not domains:
+        return jsonify({'error': 'No valid domains provided'}), 400
+    if not ips:
+        return jsonify({'error': 'No valid IP addresses provided'}), 400
+    
+    warning = None
+    if len(ips) > 50:
+        warning = f"Warning: {len(ips)} IPs provided. This may exceed SPF lookup limits."
+    
+    lines = []
+    
+    if distribute:
+        if len(ips) < len(domains):
+            return jsonify({'error': f'Not enough IPs ({len(ips)}) to distribute among {len(domains)} domains'}), 400
+        
+        ips_per_domain = len(ips) // len(domains)
+        extra_ips = len(ips) % len(domains)
+        ip_index = 0
+        
+        for i, domain in enumerate(domains):
+            count = ips_per_domain + (1 if i < extra_ips else 0)
+            domain_ips = ips[ip_index:ip_index + count]
+            ip_index += count
+            
+            ip_parts = ' '.join([f'ip4:{ip}' for ip in domain_ips])
+            spf_record = f'v=spf1 {ip_parts} -all'
+            
+            full_domain = f"{subdomain}.{domain}" if subdomain else domain
+            lines.append(f"{domain},{full_domain},TXT,{spf_record}")
+    else:
+        ip_parts = ' '.join([f'ip4:{ip}' for ip in ips])
+        spf_record = f'v=spf1 {ip_parts} -all'
+        
+        for domain in domains:
+            full_domain = f"{subdomain}.{domain}" if subdomain else domain
+            lines.append(f"{domain},{full_domain},TXT,{spf_record}")
+    
+    return jsonify({'content': '\n'.join(lines), 'count': len(lines), 'warning': warning})
+
+@app.route('/api/domain_checker/a_generate', methods=['POST'])
+@login_required
+def api_a_generate():
+    """Generate A record entries"""
+    if not current_user.has_domain_checker_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    domains_text = data.get('domains', '')
+    subdomain = data.get('subdomain', '').strip()
+    ips_text = data.get('ips', '')
+    
+    if not subdomain:
+        return jsonify({'error': 'Subdomain prefix is required for A records'}), 400
+    
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    ips = list(set([ip.strip() for ip in ips_text.strip().split('\n') if ip.strip() and is_valid_ip(ip.strip())]))
+    
+    if not domains:
+        return jsonify({'error': 'No valid domains provided'}), 400
+    if not ips:
+        return jsonify({'error': 'No valid IP addresses provided'}), 400
+    
+    warning = None
+    if len(ips) > 50:
+        warning = f"Warning: {len(ips)} unique IPs provided."
+    
+    lines = []
+    ips_str = ';'.join(ips)
+    
+    for domain in domains:
+        full_domain = f"{subdomain}.{domain}"
+        lines.append(f"{domain},{full_domain},TXT,Arecords:{ips_str}")
+    
+    return jsonify({'content': '\n'.join(lines), 'count': len(lines), 'warning': warning})
+
+@app.route('/api/domain_checker/mx', methods=['POST'])
+@login_required
+def api_mx_lookup():
+    """API endpoint for MX lookups"""
+    if not current_user.has_domain_checker_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    domains_text = data.get('domains', '')
+    
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    results = []
+    for domain in domains:
+        mx_records = lookup_mx(domain)
+        results.append({
+            'domain': domain,
+            'mx': mx_records if mx_records else ['Not Found']
+        })
+    
+    return jsonify({'results': results})
+
+@app.route('/api/domain_checker/txt', methods=['POST'])
+@login_required
+def api_txt_lookup():
+    """API endpoint for TXT lookups"""
+    if not current_user.has_domain_checker_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    domains_text = data.get('domains', '')
+    
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    results = []
+    for domain in domains:
+        txt_records = lookup_txt(domain)
+        results.append({
+            'domain': domain,
+            'txt': txt_records if txt_records else ['Not Found']
+        })
+    
+    return jsonify({'results': results})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
