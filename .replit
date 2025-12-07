@@ -3,7 +3,7 @@ run = "python app.py"
 
 [nix]
 channel = "stable-25_05"
-packages = ["openssl", "postgresql"]
+packages = ["cacert", "openssl", "postgresql"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -40,10 +40,6 @@ externalPort = 80
 [[ports]]
 localPort = 37395
 externalPort = 3000
-
-[[ports]]
-localPort = 37419
-externalPort = 3002
 
 [[ports]]
 localPort = 38411
