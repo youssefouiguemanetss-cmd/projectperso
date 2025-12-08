@@ -183,7 +183,7 @@
                                 <i class="fas fa-at mr-1"></i> Prefix (optional)
                             </label>
                             <input type="text" id="dmarc-prefix" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none" placeholder="e.g., _dmarc (leave empty for default _dmarc)">
-                            <p class="mt-1 text-xs text-gray-500">Leave empty for _dmarc.domain format, or enter custom prefix</p>
+                            <p class="mt-1 text-xs text-gray-500">Leave empty for _dmarc.domain format, or enter custom prefix. <span class="text-purple-600 font-medium">Auto-updates output as you type!</span></p>
                         </div>
                     </div>
                     <div class="mt-4 flex space-x-3">
@@ -192,38 +192,42 @@
                         </button>
                     </div>
                     <div id="dmarc-results" class="mt-6 hidden">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="text-lg font-bold text-gray-800">Results</h3>
-                            <div class="flex items-center space-x-3">
-                                <label class="text-sm font-semibold text-gray-700">Filter:</label>
-                                <select id="dmarc-filter" onchange="filterDmarcResults()" class="input-modern px-3 py-2 rounded-lg text-sm">
-                                    <option value="all">All</option>
-                                    <option value="found">Found</option>
-                                    <option value="not_found">Not Found</option>
-                                </select>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <div class="flex justify-between items-center mb-3">
+                                    <h3 class="text-lg font-bold text-gray-800">Results</h3>
+                                    <div class="flex items-center space-x-3">
+                                        <label class="text-sm font-semibold text-gray-700">Filter:</label>
+                                        <select id="dmarc-filter" onchange="filterDmarcResults()" class="input-modern px-3 py-2 rounded-lg text-sm">
+                                            <option value="all">All</option>
+                                            <option value="found">Found</option>
+                                            <option value="not_found">Not Found</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
+                                    <table class="w-full">
+                                        <thead class="sticky top-0 bg-gray-50">
+                                            <tr class="bg-gray-50">
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Domain</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">DMARC Record</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="dmarc-table-body"></tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="bg-gray-50">
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Domain</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">DMARC Record</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="dmarc-table-body"></tbody>
-                            </table>
-                        </div>
-                        <div class="mt-4">
-                            <div class="flex justify-between items-center mb-2">
-                                <label class="text-sm font-semibold text-gray-700">
-                                    <i class="fas fa-file-alt mr-1"></i> Missing DMARC Configuration
-                                </label>
-                                <button onclick="copyDmarcOutput()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
-                                    <i class="fas fa-copy mr-2"></i>Copy
-                                </button>
+                            <div>
+                                <div class="flex justify-between items-center mb-3">
+                                    <label class="text-lg font-bold text-gray-800">
+                                        <i class="fas fa-file-alt mr-1"></i> Missing DMARC Config
+                                    </label>
+                                    <button onclick="copyDmarcOutput()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                                        <i class="fas fa-copy mr-2"></i>Copy
+                                    </button>
+                                </div>
+                                <textarea id="dmarc-output" class="input-modern w-full h-64 px-4 py-3 rounded-xl focus:outline-none resize-none font-mono text-sm" readonly placeholder="Missing DMARC configurations will appear here..."></textarea>
                             </div>
-                            <textarea id="dmarc-output" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none font-mono text-sm" readonly placeholder="Missing DMARC configurations will appear here..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -483,6 +487,19 @@
                     document.getElementById('dmarc-domains').value = e.target.result;
                 };
                 reader.readAsText(file);
+            }
+        });
+
+        // Auto-update DMARC output when prefix or template changes
+        document.getElementById('dmarc-prefix').addEventListener('input', function() {
+            if (dmarcResults.length > 0) {
+                updateDmarcOutput();
+            }
+        });
+        
+        document.getElementById('dmarc-template').addEventListener('input', function() {
+            if (dmarcResults.length > 0) {
+                updateDmarcOutput();
             }
         });
 

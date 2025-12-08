@@ -140,17 +140,14 @@
                     <i class="fas fa-cog mr-2 text-green-600"></i>
                     Email Extraction Settings
                 </h3>
-                {% if current_user.entity.upper() == 'TSSW' %}
                 <button type="button" onclick="openManageExtractionModal()" class="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-lg transition-all">
                     <i class="fas fa-cog"></i>
                     <span>Manage Accounts</span>
                 </button>
-                {% endif %}
             </div>
             
             <form id="extractForm" method="POST">
-                {% if current_user.entity.upper() == 'TSSW' %}
-                <!-- Saved Accounts Dropdown for TSSW users -->
+                <!-- Saved Accounts Dropdown for all users with Extract Emails permission -->
                 <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
                     <label class="text-sm font-semibold text-gray-700 mb-2 block">
                         <i class="fas fa-bookmark mr-2 text-purple-600"></i>
@@ -161,7 +158,6 @@
                     </select>
                     <p class="text-xs text-purple-600 mt-1">Select a saved account to auto-fill the credentials below</p>
                 </div>
-                {% endif %}
 
                 <div class="grid md:grid-cols-2 gap-6">
                     <!-- Email Address -->
@@ -835,11 +831,12 @@
             }
             
             container.innerHTML = extractionAccounts.map((account, index) => `
-                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-purple-300 transition-colors" data-index="${index}">
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-purple-300 transition-colors" data-index="${index}" data-is-legacy="${account.is_legacy || false}">
                     <div class="flex-1">
                         <div class="flex items-center space-x-2">
                             <i class="fas fa-envelope text-purple-600"></i>
                             <span class="text-gray-800 font-medium">${escapeHtml(account.email)}</span>
+                            ${account.is_legacy ? '<span class="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">Legacy</span>' : ''}
                         </div>
                         <div class="text-xs text-gray-500 mt-1">
                             <span>Password: </span>
@@ -975,6 +972,8 @@
             const old_email = document.getElementById('editAccountOldEmail').value;
             const email = document.getElementById('editAccountEmail').value.trim();
             const app_password = document.getElementById('editAccountPassword').value.trim();
+            const account = extractionAccounts[index];
+            const is_legacy = account ? (account.is_legacy || false) : false;
             
             if (!email || !app_password) {
                 showExtractionToast('Please fill in all fields', 'error');
@@ -985,7 +984,7 @@
                 const response = await fetch('/api/extraction_accounts', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ old_email, email, app_password })
+                    body: JSON.stringify({ old_email, email, app_password, is_legacy })
                 });
                 
                 const result = await response.json();
@@ -1012,11 +1011,13 @@
                 return;
             }
             
+            const is_legacy = account.is_legacy || false;
+            
             try {
                 const response = await fetch('/api/extraction_accounts', {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: account.email })
+                    body: JSON.stringify({ email: account.email, is_legacy })
                 });
                 
                 const result = await response.json();

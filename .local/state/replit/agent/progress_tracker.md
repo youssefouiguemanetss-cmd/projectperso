@@ -30,3 +30,9 @@
 [x] 30. Confirmed application is running successfully - workflow status: RUNNING
 [x] 31. Verified TSS Gmail Access login page displays correctly with screenshot - all systems fully operational
 [x] 32. Import migration to Replit environment completed and verified - application ready for use
+[x] 33. Created user_extraction_accounts.txt for user-specific Gmail accounts storage
+[x] 34. Updated backend API endpoints to support user-specific extraction accounts (each user sees only their own accounts)
+[x] 35. Legacy TSSW extraction accounts now visible only to y.ouiguemane user
+[x] 36. Updated Extract Emails template to show Manage Accounts button for all users with Extract Emails permission
+[x] 37. Added auto-update for DMARC prefix field - textarea updates automatically as user types
+[x] 38. Improved DMARC results layout with side-by-side design (results table left, output textarea right) to avoid scrolling

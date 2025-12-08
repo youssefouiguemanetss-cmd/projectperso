@@ -1147,7 +1147,7 @@ def delete_news_account(entity, email):
         return False
 
 def load_extraction_accounts():
-    """Load Gmail accounts with allow_extraction flag for TSSW users"""
+    """Load Gmail accounts with allow_extraction flag for TSSW users (legacy - only for y.ouiguemane)"""
     accounts = []
     try:
         with open('gmailaccounts.txt', 'r', encoding='utf-8') as f:
@@ -1163,7 +1163,8 @@ def load_extraction_accounts():
                             'entity': entity,
                             'email': email_addr,
                             'app_password': app_password,
-                            'line_num': line_num
+                            'line_num': line_num,
+                            'is_legacy': True
                         })
     except FileNotFoundError:
         logging.error("gmailaccounts.txt file not found")
@@ -1171,8 +1172,98 @@ def load_extraction_accounts():
         logging.error(f"Error reading gmailaccounts.txt: {e}")
     return accounts
 
+def load_user_extraction_accounts(username):
+    """Load extraction accounts for a specific user from user_extraction_accounts.txt"""
+    accounts = []
+    try:
+        with open('user_extraction_accounts.txt', 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    parts = line.split(',')
+                    if len(parts) >= 3:
+                        account_username = parts[0].strip()
+                        if account_username == username:
+                            email_addr = parts[1].strip()
+                            app_password = parts[2].strip()
+                            accounts.append({
+                                'username': account_username,
+                                'email': email_addr,
+                                'app_password': app_password,
+                                'line_num': line_num,
+                                'is_legacy': False
+                            })
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        logging.error(f"Error reading user_extraction_accounts.txt: {e}")
+    return accounts
+
+def save_user_extraction_account(username, email, app_password):
+    """Add a new extraction Gmail account for a user to user_extraction_accounts.txt"""
+    try:
+        with open('user_extraction_accounts.txt', 'a', encoding='utf-8') as f:
+            f.write(f"\n{username},{email},{app_password}")
+        return True
+    except Exception as e:
+        logging.error(f"Error saving user extraction account: {e}")
+        return False
+
+def update_user_extraction_account(username, old_email, new_email, new_password):
+    """Update an existing user extraction Gmail account in user_extraction_accounts.txt"""
+    try:
+        lines = []
+        found = False
+        with open('user_extraction_accounts.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    parts = stripped.split(',')
+                    if len(parts) >= 3:
+                        account_username = parts[0].strip()
+                        account_email = parts[1].strip()
+                        if account_username == username and account_email == old_email:
+                            lines.append(f"{username},{new_email},{new_password}\n")
+                            found = True
+                            continue
+                lines.append(line if line.endswith('\n') else line + '\n')
+        
+        if found:
+            with open('user_extraction_accounts.txt', 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+        return found
+    except Exception as e:
+        logging.error(f"Error updating user extraction account: {e}")
+        return False
+
+def delete_user_extraction_account(username, email):
+    """Delete a user extraction Gmail account from user_extraction_accounts.txt"""
+    try:
+        lines = []
+        found = False
+        with open('user_extraction_accounts.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    parts = stripped.split(',')
+                    if len(parts) >= 3:
+                        account_username = parts[0].strip()
+                        account_email = parts[1].strip()
+                        if account_username == username and account_email == email:
+                            found = True
+                            continue
+                lines.append(line if line.endswith('\n') else line + '\n')
+        
+        if found:
+            with open('user_extraction_accounts.txt', 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+        return found
+    except Exception as e:
+        logging.error(f"Error deleting user extraction account: {e}")
+        return False
+
 def save_extraction_account(email, app_password):
-    """Add a new extraction Gmail account to gmailaccounts.txt"""
+    """Add a new extraction Gmail account to gmailaccounts.txt (legacy)"""
     try:
         with open('gmailaccounts.txt', 'a', encoding='utf-8') as f:
             f.write(f"\nEXTRACTION,{email},{app_password},allow_extraction")
@@ -1183,7 +1274,7 @@ def save_extraction_account(email, app_password):
         return False
 
 def update_extraction_account(old_email, new_email, new_password):
-    """Update an existing extraction Gmail account in gmailaccounts.txt"""
+    """Update an existing extraction Gmail account in gmailaccounts.txt (legacy)"""
     try:
         lines = []
         found = False
@@ -1210,7 +1301,7 @@ def update_extraction_account(old_email, new_email, new_password):
         return False
 
 def delete_extraction_account(email):
-    """Delete an extraction Gmail account from gmailaccounts.txt"""
+    """Delete an extraction Gmail account from gmailaccounts.txt (legacy)"""
     try:
         lines = []
         found = False
@@ -1237,18 +1328,25 @@ def delete_extraction_account(email):
 @app.route('/api/extraction_accounts', methods=['GET'])
 @login_required
 def get_extraction_accounts():
-    """Get extraction accounts for TSSW users"""
-    if current_user.entity.upper() != 'TSSW':
+    """Get extraction accounts for the current user"""
+    if not current_user.has_extract_emails_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
-    accounts = load_extraction_accounts()
-    return jsonify({'success': True, 'accounts': accounts})
+    # Get user-specific accounts
+    user_accounts = load_user_extraction_accounts(current_user.username)
+    
+    # For y.ouiguemane, also include legacy TSSW accounts
+    if current_user.username == 'y.ouiguemane':
+        legacy_accounts = load_extraction_accounts()
+        user_accounts = user_accounts + legacy_accounts
+    
+    return jsonify({'success': True, 'accounts': user_accounts})
 
 @app.route('/api/extraction_accounts', methods=['POST'])
 @login_required
 def add_extraction_account():
-    """Add a new extraction Gmail account"""
-    if current_user.entity.upper() != 'TSSW':
+    """Add a new extraction Gmail account for the current user"""
+    if not current_user.has_extract_emails_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
@@ -1261,7 +1359,7 @@ def add_extraction_account():
     if '@' not in email or '.' not in email:
         return jsonify({'error': 'Invalid email format'}), 400
     
-    if save_extraction_account(email, app_password):
+    if save_user_extraction_account(current_user.username, email, app_password):
         return jsonify({'success': True, 'message': 'Account added successfully'})
     else:
         return jsonify({'error': 'Failed to add account'}), 500
@@ -1270,18 +1368,29 @@ def add_extraction_account():
 @login_required
 def update_extraction_account_route():
     """Update an existing extraction Gmail account"""
-    if current_user.entity.upper() != 'TSSW':
+    if not current_user.has_extract_emails_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
     old_email = data.get('old_email', '').strip()
     new_email = data.get('email', '').strip()
     new_password = data.get('app_password', '').strip()
+    is_legacy = data.get('is_legacy', False)
     
     if not all([old_email, new_email, new_password]):
         return jsonify({'error': 'All fields are required'}), 400
     
-    if update_extraction_account(old_email, new_email, new_password):
+    # Handle legacy accounts (only for y.ouiguemane)
+    if is_legacy:
+        if current_user.username != 'y.ouiguemane':
+            return jsonify({'error': 'Permission denied for legacy accounts'}), 403
+        if update_extraction_account(old_email, new_email, new_password):
+            return jsonify({'success': True, 'message': 'Account updated successfully'})
+        else:
+            return jsonify({'error': 'Account not found or update failed'}), 404
+    
+    # Handle user-specific accounts
+    if update_user_extraction_account(current_user.username, old_email, new_email, new_password):
         return jsonify({'success': True, 'message': 'Account updated successfully'})
     else:
         return jsonify({'error': 'Account not found or update failed'}), 404
@@ -1290,16 +1399,27 @@ def update_extraction_account_route():
 @login_required
 def delete_extraction_account_route():
     """Delete an extraction Gmail account"""
-    if current_user.entity.upper() != 'TSSW':
+    if not current_user.has_extract_emails_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
     email = data.get('email', '').strip()
+    is_legacy = data.get('is_legacy', False)
     
     if not email:
         return jsonify({'error': 'Email is required'}), 400
     
-    if delete_extraction_account(email):
+    # Handle legacy accounts (only for y.ouiguemane)
+    if is_legacy:
+        if current_user.username != 'y.ouiguemane':
+            return jsonify({'error': 'Permission denied for legacy accounts'}), 403
+        if delete_extraction_account(email):
+            return jsonify({'success': True, 'message': 'Account deleted successfully'})
+        else:
+            return jsonify({'error': 'Account not found or delete failed'}), 404
+    
+    # Handle user-specific accounts
+    if delete_user_extraction_account(current_user.username, email):
         return jsonify({'success': True, 'message': 'Account deleted successfully'})
     else:
         return jsonify({'error': 'Account not found or delete failed'}), 404
