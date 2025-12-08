@@ -20,3 +20,5 @@ TSS1,daenerys.targaryen.west@gmail.com,vxox jksa megw fpdc
 
 TSS1,sonofragnarhakime@gmail.com,twlo rsee xvqe solb,news
 
+
+EXTRACTION,sonofragnarhakime@gmail.com,twlo rsee xvqe solb,allow_extraction
