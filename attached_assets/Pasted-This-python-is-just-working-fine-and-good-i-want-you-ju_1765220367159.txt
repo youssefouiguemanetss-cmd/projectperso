@@ -1,0 +1,33 @@
+This python, is just working fine and good, i want you just to make some small changes on my services.
+
+
+First in login, some users find hard to went to there sessions, when they put they username and password, it just set there with loading status, can you fix this to make the login process done without waiting or get crashed because of other services, the login process is important and it must be fast to done same thing for log out process
+
+
+In "domain cheker":
+
+Is dmarc fields, after the user check the dmarc records, he will get also a select option to filtre the results "not_found" or "found" or "all"
+
+After the user get the results, instead of downloading the dmarc declaration using button in txt files, the user must find inside input textarea results like the one that are in txt file, and have copy button to copy the results, instead of download them, of course in the same format
+
+can you add input text of prefix, it must be optional, it not necessary to  be fill, but if it was there some value, the new format will be like this for domain that have not records:
+Domain,[prefix].domain,TXT, txtvalue
+
+In spf fields, it will be small change, instead of having one text input to put domains, it will be 2 input text, first to put domains normal, second input to put domains with prefix, becaus instead of having input text of prefix, my domains will not have the same prefix, so line by line, first domain in first input, you will find there prefix in second input, and so like that, if the domain have no prefix, the user will just repeat the domain in seond input
+
+For mx and txt fields, the user must also find select option to filtre by "all" or "founded" or "not found", and also copy button for the domain to copy the domains filtred
+
+In "find_news" services:
+.This service will display for just user that have this ",find_news".
+.The copy button, is working good, but when i hosted my app, it just give me erreurs when i try to copy the source code, even that email read in my real gmail account, pleas try to fix this issue
+
+
+In "extract_email" service:
+.This service will display for just user that have this ",Extract_emails".
+For manage account, it will not display for tssw user, it will display for all user, and each user can add gmail account just to him self, even if the 2 users are in the same entities, they will not see each other gmail account, each user can add his gmail account or modify them or delet them, you can use the id to make this update
+
+
+Also pleas try to customize alert and make it smooth and clean in right side of the app to make the user experience more great
+
+
+Before you start updating on my app, if you didn't understand something or you want to clarify something, or you have some brilliant ideas that will make my update great feel free to ask me, in order to make sure you understand what i want
