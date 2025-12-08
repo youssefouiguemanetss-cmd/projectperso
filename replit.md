@@ -93,12 +93,29 @@ Visual identification in Gmail account dropdown menu:
 
 ## Authentication Files
 - **users.txt**: Format: `Entity,Name,Username,Password[,permissions]` (one per line)
-  - Permissions can include: `ok` (toggle permissions), `allow_add_gmail_of_news` (manage news accounts)
+  - Permissions can include: 
+    - `ok` (toggle permissions)
+    - `allow_add_gmail_of_news` (manage news accounts)
+    - `Domain_checker` (access Domain Checker service)
+    - `find_news` (access Find News service)
+    - `Extract_emails` (access Extract Emails service)
   - Multiple permissions separated by comma
 - **gmailaccounts.txt**: Format: `Entity,EmailAddress,AppPassword[,news]` (one per line)
   - Add `,news` suffix to mark accounts for the "Find News" service
 
 ## Recent Changes (December 2025)
+
+### Performance and Permission Updates (December 8, 2025)
+- ✅ Optimized login/logout by removing Gmail connection manager calls (faster authentication)
+- ✅ Added new permissions: `find_news` and `Extract_emails` for service-level access control
+- ✅ Services page now conditionally displays Find News and Extract Emails based on user permissions
+- ✅ Route-level permission checks redirect unauthorized users to services page
+- ✅ Domain Checker DMARC: Added filter dropdown (all/found/not_found), textarea with copy button, optional prefix input
+- ✅ Domain Checker SPF: Dual input system for domains and prefixed domains (line-by-line matching)
+- ✅ Domain Checker MX/TXT: Added filter dropdowns and copy button for filtered domains
+- ✅ Find News: Fixed clipboard copy with fallback method for hosted environments
+- ✅ Added toast-style auto-dismiss notifications positioned on right side
+
 ### User Profile and Permission System (December 4, 2025)
 - ✅ Updated users.txt format to include Name field: `entity,Name,username,password[,permissions]`
 - ✅ Personalized user experience now displays Name in welcome messages and navigation bars
