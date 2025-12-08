@@ -1,14 +1,14 @@
 # Format: entity,Name,username,password[,permissions]
 # Permissions can be: ok, allow_add_gmail_of_news (or both separated by comma)
 TSS2,Abdelali,abdelali,TrIaOIaaq2EcLi3LLSgcdWz3,ok
-TSSW,Redouan,redouan,red123*00,allow_add_gmail_of_news
+TSSW,Redouan,redouan,red123*00,allow_add_gmail_of_news,Domain_checker
 TSSW,Y. Ouiguemane,y.ouiguemane,y.ouiguemane2234,Domain_checker
 TSS2,M. Edraoui,M.Edraoui,vYfeg2C5SXo8lbmQ8eai4t1
 TSS2,H. Boudfa,H.BOUDFA,5C56giIhxd3L3pKkzPB5QTW
 TSS2,I. Ait Hadi,I.Ait_Hadi,Q13T2v52HGNdVoJe7hs59pQ
 TSS2,R. El Abdellaoui,R.El_Abdellaoui,KIB05zGqmYFf36x5zqK2iBS
 TSS2,H. Ahaddouch,H.AHADDOUCH,3oM5UULBZuDWiEDb2l1EN1X
-TSS2,Adnan,Adnan,efa3Jwe4g7Ei3c0I94NMDER,ok
+TSS2,Adnan,Adnan,efa3Jwe4g7Ei3c0I94NMDER,ok,Domain_checker
 TSS3,Adil Benmoussa,AdilBenmoussa,2LOj6VWMtkrh38mI
 TSS3,Ayoub Lakbir,AYOUBLAKBIR,wKQD673jQBJGFt1q
 TSS3,Soufian Akdi,SoufianAKDI,7KTEAfGwzk1H
@@ -21,8 +21,8 @@ TSSF,Arifi Chakir,ArifiChakir,m1yn5xPSeZv
 TSSF,Ahmimed Aya,AhmimedAya,5TkCUunjJjK
 TSSF,Ahmimed Alae,AhmimedAlae,HDaA4T4ntg1
 TSSF,El Alilti Yassine,ELaliltiYassine,uCG75qf4H5n
-TSS3,M. Amine Elmorabet,M.Amine_Elmorabet,bC18wSC8mjShczF,ok
-TSSF,Rabab Loumrani,Rabab_Loumrani,7P6Aavr2TX8Whes,ok
+TSS3,M. Amine Elmorabet,M.Amine_Elmorabet,bC18wSC8mjShczF,ok,Domain_checker
+TSSF,Rabab Loumrani,Rabab_Loumrani,7P6Aavr2TX8Whes,ok,Domain_checker
 TSS1,Mohamed Amine Tahri,Mohamedamine_tahri,81bOnasisatha
 TSS1,Issam Tchikou,Issam_Tchikou,phigosUb6qiVA
 TSS1,El Alilti Yassine,El Alilti_Yassine,9unlbeblxujAp
@@ -33,6 +33,6 @@ TSS1,Taoufik Razak,TAOUFIK_RAZAK,fuDrEDaqlqI12
 TSS1,Youssef Chakour,YOUSSEF_CHAKOUR,glbrLd1i3LYIz
 TSS1,Ouessan Benayad,ouessan_benayad,fodOs0ukIdrAv
 TSS1,Omar Elothmani,omar_elothmani,2HLvIvat7oswl,ok
-TSS1,Oussama Almorabet,oussama_almorabet,niHUditRet2lg,ok
-TSS3,Khaoula Oughanem,Khaoula.Oughanem,trA6r6hlFoph,ok
+TSS1,Oussama Almorabet,oussama_almorabet,niHUditRet2lg,ok,Domain_checker
+TSS3,Khaoula Oughanem,Khaoula.Oughanem,trA6r6hlFoph,ok,Domain_checker
 TSS3,Mariam El Morabit,Mariam_ElMORABIT,yuR0frozUfrU6os
