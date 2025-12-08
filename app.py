@@ -34,7 +34,7 @@ login_manager.login_message_category = 'info'
 
 # User class for Flask-Login
 class User(UserMixin):
-    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False):
+    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False):
         self.id = username
         self.username = username
         self.entity = entity
@@ -42,6 +42,8 @@ class User(UserMixin):
         self.has_toggle_permission = has_toggle_permission
         self.has_news_permission = has_news_permission
         self.has_domain_checker_permission = has_domain_checker_permission
+        self.has_find_news_permission = has_find_news_permission
+        self.has_extract_emails_permission = has_extract_emails_permission
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -54,8 +56,10 @@ def load_user(user_id):
         has_toggle = user_data['has_toggle_permission']
         has_news = user_data['has_news_permission']
         has_domain_checker = user_data['has_domain_checker_permission']
+        has_find_news = user_data['has_find_news_permission']
+        has_extract_emails = user_data['has_extract_emails_permission']
         if username == user_id:
-            return User(username, entity, name, has_toggle, has_news, has_domain_checker)
+            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails)
     return None
 
 def load_users_from_file():
@@ -77,6 +81,8 @@ def load_users_from_file():
                             has_toggle = 'ok' in permissions
                             has_news = 'allow_add_gmail_of_news' in permissions
                             has_domain_checker = 'Domain_checker' in permissions
+                            has_find_news = 'find_news' in permissions
+                            has_extract_emails = 'Extract_emails' in permissions
                             users.append({
                                 'entity': entity,
                                 'name': name,
@@ -85,7 +91,9 @@ def load_users_from_file():
                                 'permissions': permissions,
                                 'has_toggle_permission': has_toggle,
                                 'has_news_permission': has_news,
-                                'has_domain_checker_permission': has_domain_checker
+                                'has_domain_checker_permission': has_domain_checker,
+                                'has_find_news_permission': has_find_news,
+                                'has_extract_emails_permission': has_extract_emails
                             })
                         else:
                             logging.warning(f"Invalid format in users.txt line {line_num}: {line}")
@@ -702,16 +710,12 @@ def login():
             user_name = user_data['name']
             has_toggle = user_data['has_toggle_permission']
             has_news = user_data['has_news_permission']
+            has_domain_checker = user_data['has_domain_checker_permission']
+            has_find_news = user_data['has_find_news_permission']
+            has_extract_emails = user_data['has_extract_emails_permission']
             
-            user = User(username, user_entity, user_name, has_toggle, has_news)
+            user = User(username, user_entity, user_name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails)
             login_user(user, remember=True)
-            
-            # Notify connection manager about user login (independent of login success)
-            try:
-                gmail_manager.user_login(username, user_entity)
-                logging.info(f"Gmail connections activated for user {username} ({user_entity})")
-            except Exception as e:
-                logging.warning(f"Gmail connection manager failed during login for {username}: {e}")
             
             flash(f'Welcome, {user_name}!', 'success')
             
@@ -729,16 +733,6 @@ def login():
 @login_required
 def logout():
     username = current_user.username
-    user_entity = current_user.entity
-    
-    # Notify connection manager about user logout (independent of logout success)
-    try:
-        gmail_manager.user_logout(username, user_entity)
-        logging.info(f"Gmail connections deactivated for user {username} ({user_entity})")
-    except Exception as e:
-        logging.warning(f"Gmail connection manager failed during logout for {username}: {e}")
-        # Logout still succeeds even if Gmail connection cleanup fails
-    
     logout_user()
     flash(f'You have been logged out successfully, {username}.', 'info')
     return redirect(url_for('login'))
@@ -758,6 +752,10 @@ def services():
 @login_required
 def extract_emails():
     """TSS Extract Emails service"""
+    if not current_user.has_extract_emails_permission:
+        flash('You do not have permission to access the Extract Emails service.', 'error')
+        return redirect(url_for('services'))
+    
     if request.method == 'GET':
         return render_template('extract_emails.html', current_user=current_user)
     
@@ -1040,6 +1038,10 @@ def get_account_status(account_key):
 @login_required
 def find_news():
     """Find News dashboard - displays news Gmail accounts"""
+    if not current_user.has_find_news_permission:
+        flash('You do not have permission to access the Find News service.', 'error')
+        return redirect(url_for('services'))
+    
     news_accounts = gmail_manager.get_news_accounts(current_user.entity)
     
     # Get list of entities for TSSW users (they can add accounts to any entity)
@@ -1716,23 +1718,27 @@ def api_dmarc_download():
 @app.route('/api/domain_checker/spf_generate', methods=['POST'])
 @login_required
 def api_spf_generate():
-    """Generate SPF records"""
+    """Generate SPF records with dual input system for domains and prefixed domains"""
     if not current_user.has_domain_checker_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
     domains_text = data.get('domains', '')
-    subdomain = data.get('subdomain', '').strip()
+    prefixed_domains_text = data.get('prefixed_domains', '')
     ips_text = data.get('ips', '')
     distribute = data.get('distribute', False)
     
     domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    prefixed_domains = [d.strip().lower() for d in prefixed_domains_text.strip().split('\n') if d.strip()]
     ips = [ip.strip() for ip in ips_text.strip().split('\n') if ip.strip() and is_valid_ip(ip.strip())]
     
     if not domains:
         return jsonify({'error': 'No valid domains provided'}), 400
     if not ips:
         return jsonify({'error': 'No valid IP addresses provided'}), 400
+    
+    if prefixed_domains and len(prefixed_domains) != len(domains):
+        return jsonify({'error': f'Number of prefixed domains ({len(prefixed_domains)}) must match number of domains ({len(domains)})'}), 400
     
     warning = None
     if len(ips) > 50:
@@ -1756,14 +1762,14 @@ def api_spf_generate():
             ip_parts = ' '.join([f'ip4:{ip}' for ip in domain_ips])
             spf_record = f'v=spf1 {ip_parts} -all'
             
-            full_domain = f"{subdomain}.{domain}" if subdomain else domain
+            full_domain = prefixed_domains[i] if prefixed_domains else domain
             lines.append(f"{domain},{full_domain},TXT,{spf_record}")
     else:
         ip_parts = ' '.join([f'ip4:{ip}' for ip in ips])
         spf_record = f'v=spf1 {ip_parts} -all'
         
-        for domain in domains:
-            full_domain = f"{subdomain}.{domain}" if subdomain else domain
+        for i, domain in enumerate(domains):
+            full_domain = prefixed_domains[i] if prefixed_domains else domain
             lines.append(f"{domain},{full_domain},TXT,{spf_record}")
     
     return jsonify({'content': '\n'.join(lines), 'count': len(lines), 'warning': warning})

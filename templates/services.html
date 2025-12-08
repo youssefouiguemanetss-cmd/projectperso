@@ -140,6 +140,7 @@
                 </div>
             </div>
 
+            {% if current_user.has_extract_emails_permission %}
             <!-- TSS Extract Emails Service -->
             <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
                  onclick="window.location.href='{{ url_for('extract_emails') }}'">
@@ -185,7 +186,9 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
+            {% if current_user.has_find_news_permission %}
             <!-- Find News Service -->
             <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
                  onclick="window.location.href='{{ url_for('find_news') }}'">
@@ -231,6 +234,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
             {% if current_user.has_domain_checker_permission %}
             <!-- Domain Checker Service -->

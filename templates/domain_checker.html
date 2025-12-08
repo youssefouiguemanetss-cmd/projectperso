@@ -175,22 +175,34 @@
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-edit mr-1"></i> DMARC Template (for download)
+                                <i class="fas fa-edit mr-1"></i> DMARC TXT Value Template
                             </label>
-                            <textarea id="dmarc-template" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none text-sm">v=DMARC1; p=reject; rua=mailto:postmaster@[domain]; ruf=mailto:dmarc@[domain]; fo=1; pct=100</textarea>
+                            <textarea id="dmarc-template" class="input-modern w-full h-24 px-4 py-3 rounded-xl focus:outline-none resize-none text-sm">v=DMARC1; p=reject; rua=mailto:postmaster@[domain]; ruf=mailto:dmarc@[domain]; fo=1; pct=100</textarea>
                             <p class="mt-2 text-xs text-gray-500">Use [domain] as placeholder for the domain name</p>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2 mt-4">
+                                <i class="fas fa-at mr-1"></i> Prefix (optional)
+                            </label>
+                            <input type="text" id="dmarc-prefix" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none" placeholder="e.g., _dmarc (leave empty for default _dmarc)">
+                            <p class="mt-1 text-xs text-gray-500">Leave empty for _dmarc.domain format, or enter custom prefix</p>
                         </div>
                     </div>
                     <div class="mt-4 flex space-x-3">
                         <button onclick="lookupDmarc()" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center">
                             <i class="fas fa-search mr-2"></i>Check DMARC Records
                         </button>
-                        <button onclick="downloadDmarcMissing()" class="btn-success text-white px-6 py-3 rounded-xl flex items-center">
-                            <i class="fas fa-download mr-2"></i>Download Missing Only
-                        </button>
                     </div>
                     <div id="dmarc-results" class="mt-6 hidden">
-                        <h3 class="text-lg font-bold text-gray-800 mb-3">Results</h3>
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-lg font-bold text-gray-800">Results</h3>
+                            <div class="flex items-center space-x-3">
+                                <label class="text-sm font-semibold text-gray-700">Filter:</label>
+                                <select id="dmarc-filter" onchange="filterDmarcResults()" class="input-modern px-3 py-2 rounded-lg text-sm">
+                                    <option value="all">All</option>
+                                    <option value="found">Found</option>
+                                    <option value="not_found">Not Found</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead>
@@ -202,16 +214,34 @@
                                 <tbody id="dmarc-table-body"></tbody>
                             </table>
                         </div>
+                        <div class="mt-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-sm font-semibold text-gray-700">
+                                    <i class="fas fa-file-alt mr-1"></i> Missing DMARC Configuration
+                                </label>
+                                <button onclick="copyDmarcOutput()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                                    <i class="fas fa-copy mr-2"></i>Copy
+                                </button>
+                            </div>
+                            <textarea id="dmarc-output" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none font-mono text-sm" readonly placeholder="Missing DMARC configurations will appear here..."></textarea>
+                        </div>
                     </div>
                 </div>
 
                 <div id="tab-spf" class="tab-content hidden">
-                    <div class="grid grid-cols-2 gap-6">
+                    <div class="grid grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
                                 <i class="fas fa-list mr-1"></i> Domains (one per line)
                             </label>
-                            <textarea id="spf-domains" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="example.com&#10;domain.org"></textarea>
+                            <textarea id="spf-domains" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="example.com&#10;domain.org&#10;website.net"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-at mr-1"></i> Prefixed Domains (one per line)
+                            </label>
+                            <textarea id="spf-prefixed-domains" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="mail.example.com&#10;domain.org&#10;smtp.website.net"></textarea>
+                            <p class="mt-1 text-xs text-gray-500">Match line-by-line with domains. Repeat domain if no prefix needed.</p>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -220,19 +250,10 @@
                             <textarea id="spf-ips" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="1.2.3.4&#10;5.6.7.8"></textarea>
                         </div>
                     </div>
-                    <div class="mt-4 grid grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-at mr-1"></i> Subdomain Prefix (optional)
-                            </label>
-                            <input type="text" id="spf-subdomain" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none" placeholder="e.g., mail">
-                            <p class="mt-1 text-xs text-gray-500">Leave empty for root domain, or enter prefix like "mail" for mail.example.com</p>
-                        </div>
-                        <div class="flex items-center">
-                            <div class="flex items-center space-x-3">
-                                <div id="spf-distribute-toggle" class="toggle-switch" onclick="toggleDistribute()"></div>
-                                <label class="text-sm font-semibold text-gray-700">Distribute IPs Equally Per Domain</label>
-                            </div>
+                    <div class="mt-4 flex items-center space-x-6">
+                        <div class="flex items-center space-x-3">
+                            <div id="spf-distribute-toggle" class="toggle-switch" onclick="toggleDistribute()"></div>
+                            <label class="text-sm font-semibold text-gray-700">Distribute IPs Equally Per Domain</label>
                         </div>
                     </div>
                     <div class="mt-4">
@@ -308,7 +329,20 @@
                         </button>
                     </div>
                     <div id="mx-results" class="mt-6 hidden">
-                        <h3 class="text-lg font-bold text-gray-800 mb-3">Results</h3>
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-lg font-bold text-gray-800">Results</h3>
+                            <div class="flex items-center space-x-3">
+                                <label class="text-sm font-semibold text-gray-700">Filter:</label>
+                                <select id="mx-filter" onchange="filterMxResults()" class="input-modern px-3 py-2 rounded-lg text-sm">
+                                    <option value="all">All</option>
+                                    <option value="found">Found</option>
+                                    <option value="not_found">Not Found</option>
+                                </select>
+                                <button onclick="copyMxDomains()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                                    <i class="fas fa-copy mr-2"></i>Copy Domains
+                                </button>
+                            </div>
+                        </div>
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead>
@@ -336,7 +370,20 @@
                         </button>
                     </div>
                     <div id="txt-results" class="mt-6 hidden">
-                        <h3 class="text-lg font-bold text-gray-800 mb-3">Results</h3>
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-lg font-bold text-gray-800">Results</h3>
+                            <div class="flex items-center space-x-3">
+                                <label class="text-sm font-semibold text-gray-700">Filter:</label>
+                                <select id="txt-filter" onchange="filterTxtResults()" class="input-modern px-3 py-2 rounded-lg text-sm">
+                                    <option value="all">All</option>
+                                    <option value="found">Found</option>
+                                    <option value="not_found">Not Found</option>
+                                </select>
+                                <button onclick="copyTxtDomains()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                                    <i class="fas fa-copy mr-2"></i>Copy Domains
+                                </button>
+                            </div>
+                        </div>
                         <div class="overflow-x-auto">
                             <table class="w-full">
                                 <thead>
@@ -361,8 +408,62 @@
         </div>
     </div>
 
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
     <script>
         let distributeIps = false;
+        let dmarcResults = [];
+        let mxResults = [];
+        let txtResults = [];
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500',
+                warning: 'bg-yellow-500'
+            };
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-times-circle',
+                info: 'fa-info-circle',
+                warning: 'fa-exclamation-triangle'
+            };
+            toast.className = `${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-2 min-w-64 transform transition-all duration-300 translate-x-full opacity-0`;
+            toast.innerHTML = `<i class="fas ${icons[type]}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        async function copyToClipboard(text) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.left = '-9999px';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                }
+                showToast('Copied to clipboard!', 'success');
+            } catch (err) {
+                showToast('Failed to copy to clipboard', 'error');
+            }
+        }
 
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -399,7 +500,7 @@
         }
 
         function showError(message) {
-            alert(message);
+            showToast(message, 'error');
         }
 
         async function lookupDmarc() {
@@ -423,22 +524,10 @@
                     return;
                 }
 
-                const tbody = document.getElementById('dmarc-table-body');
-                tbody.innerHTML = '';
-                
-                data.results.forEach(r => {
-                    const row = document.createElement('tr');
-                    row.className = 'result-row border-b border-gray-100';
-                    const isNotFound = r.dmarc === 'Not Found';
-                    row.innerHTML = `
-                        <td class="px-4 py-3 font-mono text-sm">${r.domain}</td>
-                        <td class="px-4 py-3 text-sm ${isNotFound ? 'text-red-600' : 'text-green-600'}">
-                            ${isNotFound ? '<i class="fas fa-times-circle mr-1"></i>' : '<i class="fas fa-check-circle mr-1"></i>'}
-                            ${r.dmarc}
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                dmarcResults = data.results;
+                document.getElementById('dmarc-filter').value = 'all';
+                renderDmarcResults(dmarcResults);
+                updateDmarcOutput();
 
                 document.getElementById('dmarc-results').classList.remove('hidden');
             } catch (error) {
@@ -447,55 +536,64 @@
                 hideLoading();
             }
         }
-
-        async function downloadDmarcMissing() {
-            const domains = document.getElementById('dmarc-domains').value.trim();
-            const template = document.getElementById('dmarc-template').value.trim();
+        
+        function renderDmarcResults(results) {
+            const tbody = document.getElementById('dmarc-table-body');
+            tbody.innerHTML = '';
             
-            if (!domains) {
-                showError('Please enter at least one domain');
+            results.forEach(r => {
+                const row = document.createElement('tr');
+                row.className = 'result-row border-b border-gray-100';
+                const isNotFound = r.dmarc === 'Not Found';
+                row.dataset.found = isNotFound ? 'no' : 'yes';
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-mono text-sm">${r.domain}</td>
+                    <td class="px-4 py-3 text-sm ${isNotFound ? 'text-red-600' : 'text-green-600'}">
+                        ${isNotFound ? '<i class="fas fa-times-circle mr-1"></i>' : '<i class="fas fa-check-circle mr-1"></i>'}
+                        ${r.dmarc}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function filterDmarcResults() {
+            const filter = document.getElementById('dmarc-filter').value;
+            let filtered = dmarcResults;
+            if (filter === 'found') {
+                filtered = dmarcResults.filter(r => r.dmarc !== 'Not Found');
+            } else if (filter === 'not_found') {
+                filtered = dmarcResults.filter(r => r.dmarc === 'Not Found');
+            }
+            renderDmarcResults(filtered);
+        }
+        
+        function updateDmarcOutput() {
+            const template = document.getElementById('dmarc-template').value.trim();
+            const prefix = document.getElementById('dmarc-prefix').value.trim() || '_dmarc';
+            const missing = dmarcResults.filter(r => r.dmarc === 'Not Found');
+            
+            const output = missing.map(r => {
+                const txtValue = template.replace(/\[domain\]/g, r.domain);
+                return `${r.domain},${prefix}.${r.domain},TXT,${txtValue}`;
+            }).join('\n');
+            
+            document.getElementById('dmarc-output').value = output;
+        }
+        
+        function copyDmarcOutput() {
+            const output = document.getElementById('dmarc-output').value;
+            if (!output) {
+                showToast('No missing DMARC records to copy', 'warning');
                 return;
             }
-
-            showLoading();
-            try {
-                const response = await fetch('/api/domain_checker/dmarc_download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domains, template })
-                });
-
-                const data = await response.json();
-                if (data.error) {
-                    showError(data.error);
-                    return;
-                }
-
-                if (data.count === 0) {
-                    alert('All domains have DMARC records. No file generated.');
-                    return;
-                }
-
-                const blob = new Blob([data.content], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'dmarc_missing_' + new Date().toISOString().slice(0,10) + '.txt';
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                alert(`Downloaded file with ${data.count} domains missing DMARC records.`);
-            } catch (error) {
-                showError('Error: ' + error.message);
-            } finally {
-                hideLoading();
-            }
+            copyToClipboard(output);
         }
 
         async function generateSpf() {
             const domains = document.getElementById('spf-domains').value.trim();
+            const prefixedDomains = document.getElementById('spf-prefixed-domains').value.trim();
             const ips = document.getElementById('spf-ips').value.trim();
-            const subdomain = document.getElementById('spf-subdomain').value.trim();
 
             if (!domains || !ips) {
                 showError('Please enter domains and IP addresses');
@@ -507,7 +605,7 @@
                 const response = await fetch('/api/domain_checker/spf_generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domains, ips, subdomain, distribute: distributeIps })
+                    body: JSON.stringify({ domains, prefixed_domains: prefixedDomains, ips, distribute: distributeIps })
                 });
 
                 const data = await response.json();
@@ -534,10 +632,12 @@
         }
 
         function copySpfOutput() {
-            const output = document.getElementById('spf-output');
-            output.select();
-            document.execCommand('copy');
-            alert('Copied to clipboard!');
+            const output = document.getElementById('spf-output').value;
+            if (!output) {
+                showToast('No SPF records to copy', 'warning');
+                return;
+            }
+            copyToClipboard(output);
         }
 
         async function generateA() {
@@ -587,10 +687,12 @@
         }
 
         function copyAOutput() {
-            const output = document.getElementById('a-output');
-            output.select();
-            document.execCommand('copy');
-            alert('Copied to clipboard!');
+            const output = document.getElementById('a-output').value;
+            if (!output) {
+                showToast('No A records to copy', 'warning');
+                return;
+            }
+            copyToClipboard(output);
         }
 
         async function lookupMx() {
@@ -614,21 +716,9 @@
                     return;
                 }
 
-                const tbody = document.getElementById('mx-table-body');
-                tbody.innerHTML = '';
-                
-                data.results.forEach(r => {
-                    const row = document.createElement('tr');
-                    row.className = 'result-row border-b border-gray-100';
-                    const isNotFound = r.mx.length === 1 && r.mx[0] === 'Not Found';
-                    row.innerHTML = `
-                        <td class="px-4 py-3 font-mono text-sm">${r.domain}</td>
-                        <td class="px-4 py-3 text-sm ${isNotFound ? 'text-red-600' : ''}">
-                            ${r.mx.map(m => `<div>${m}</div>`).join('')}
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                mxResults = data.results;
+                document.getElementById('mx-filter').value = 'all';
+                renderMxResults(mxResults);
 
                 document.getElementById('mx-results').classList.remove('hidden');
             } catch (error) {
@@ -636,6 +726,52 @@
             } finally {
                 hideLoading();
             }
+        }
+        
+        function renderMxResults(results) {
+            const tbody = document.getElementById('mx-table-body');
+            tbody.innerHTML = '';
+            
+            results.forEach(r => {
+                const row = document.createElement('tr');
+                row.className = 'result-row border-b border-gray-100';
+                const isNotFound = r.mx.length === 1 && r.mx[0] === 'Not Found';
+                row.dataset.found = isNotFound ? 'no' : 'yes';
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-mono text-sm">${r.domain}</td>
+                    <td class="px-4 py-3 text-sm ${isNotFound ? 'text-red-600' : ''}">
+                        ${r.mx.map(m => `<div>${m}</div>`).join('')}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function filterMxResults() {
+            const filter = document.getElementById('mx-filter').value;
+            let filtered = mxResults;
+            if (filter === 'found') {
+                filtered = mxResults.filter(r => !(r.mx.length === 1 && r.mx[0] === 'Not Found'));
+            } else if (filter === 'not_found') {
+                filtered = mxResults.filter(r => r.mx.length === 1 && r.mx[0] === 'Not Found');
+            }
+            renderMxResults(filtered);
+        }
+        
+        function copyMxDomains() {
+            const filter = document.getElementById('mx-filter').value;
+            let filtered = mxResults;
+            if (filter === 'found') {
+                filtered = mxResults.filter(r => !(r.mx.length === 1 && r.mx[0] === 'Not Found'));
+            } else if (filter === 'not_found') {
+                filtered = mxResults.filter(r => r.mx.length === 1 && r.mx[0] === 'Not Found');
+            }
+            const domains = filtered.map(r => r.domain).join('\n');
+            if (!domains) {
+                showToast('No domains to copy', 'warning');
+                return;
+            }
+            copyToClipboard(domains);
         }
 
         async function lookupTxt() {
@@ -659,21 +795,9 @@
                     return;
                 }
 
-                const tbody = document.getElementById('txt-table-body');
-                tbody.innerHTML = '';
-                
-                data.results.forEach(r => {
-                    const row = document.createElement('tr');
-                    row.className = 'result-row border-b border-gray-100';
-                    const isNotFound = r.txt.length === 1 && r.txt[0] === 'Not Found';
-                    row.innerHTML = `
-                        <td class="px-4 py-3 font-mono text-sm">${r.domain}</td>
-                        <td class="px-4 py-3 text-sm ${isNotFound ? 'text-red-600' : ''}">
-                            ${r.txt.map(t => `<div class="mb-1 p-2 bg-gray-50 rounded text-xs break-all">${t}</div>`).join('')}
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                });
+                txtResults = data.results;
+                document.getElementById('txt-filter').value = 'all';
+                renderTxtResults(txtResults);
 
                 document.getElementById('txt-results').classList.remove('hidden');
             } catch (error) {
@@ -681,6 +805,52 @@
             } finally {
                 hideLoading();
             }
+        }
+        
+        function renderTxtResults(results) {
+            const tbody = document.getElementById('txt-table-body');
+            tbody.innerHTML = '';
+            
+            results.forEach(r => {
+                const row = document.createElement('tr');
+                row.className = 'result-row border-b border-gray-100';
+                const isNotFound = r.txt.length === 1 && r.txt[0] === 'Not Found';
+                row.dataset.found = isNotFound ? 'no' : 'yes';
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-mono text-sm">${r.domain}</td>
+                    <td class="px-4 py-3 text-sm ${isNotFound ? 'text-red-600' : ''}">
+                        ${r.txt.map(t => `<div class="mb-1 p-2 bg-gray-50 rounded text-xs break-all">${t}</div>`).join('')}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function filterTxtResults() {
+            const filter = document.getElementById('txt-filter').value;
+            let filtered = txtResults;
+            if (filter === 'found') {
+                filtered = txtResults.filter(r => !(r.txt.length === 1 && r.txt[0] === 'Not Found'));
+            } else if (filter === 'not_found') {
+                filtered = txtResults.filter(r => r.txt.length === 1 && r.txt[0] === 'Not Found');
+            }
+            renderTxtResults(filtered);
+        }
+        
+        function copyTxtDomains() {
+            const filter = document.getElementById('txt-filter').value;
+            let filtered = txtResults;
+            if (filter === 'found') {
+                filtered = txtResults.filter(r => !(r.txt.length === 1 && r.txt[0] === 'Not Found'));
+            } else if (filter === 'not_found') {
+                filtered = txtResults.filter(r => r.txt.length === 1 && r.txt[0] === 'Not Found');
+            }
+            const domains = filtered.map(r => r.domain).join('\n');
+            if (!domains) {
+                showToast('No domains to copy', 'warning');
+                return;
+            }
+            copyToClipboard(domains);
         }
     </script>
 </body>

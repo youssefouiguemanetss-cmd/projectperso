@@ -579,6 +579,30 @@
             return div.innerHTML;
         }
 
+        async function copyToClipboard(text) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.left = '-9999px';
+                    textarea.style.top = '0';
+                    document.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    const success = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    return success;
+                }
+            } catch (err) {
+                console.error('Clipboard copy failed:', err);
+                return false;
+            }
+        }
+        
         async function copySource(uid) {
             if (!selectedAccount) return;
             
@@ -595,8 +619,12 @@
                 btn.disabled = false;
 
                 if (data.success && data.source) {
-                    await navigator.clipboard.writeText(data.source);
-                    showToast('Source copied to clipboard!');
+                    const success = await copyToClipboard(data.source);
+                    if (success) {
+                        showToast('Source copied to clipboard!');
+                    } else {
+                        showToast('Failed to copy to clipboard', true);
+                    }
                 } else {
                     showToast('Failed to get email source', true);
                 }
@@ -628,8 +656,12 @@
 
         async function copySourceFromModal() {
             const source = document.getElementById('source-content').textContent;
-            await navigator.clipboard.writeText(source);
-            showToast('Source copied to clipboard!');
+            const success = await copyToClipboard(source);
+            if (success) {
+                showToast('Source copied to clipboard!');
+            } else {
+                showToast('Failed to copy to clipboard', true);
+            }
         }
 
         function showToast(message, isError = false) {
@@ -637,9 +669,9 @@
             const toastMessage = document.getElementById('toast-message');
             
             if (isError) {
-                toast.className = 'fixed bottom-6 right-6 bg-gradient-to-r from-red-500 to-rose-500 text-white px-5 py-3 rounded-xl shadow-2xl toast flex items-center space-x-2';
+                toast.className = 'fixed top-6 right-6 bg-gradient-to-r from-red-500 to-rose-500 text-white px-5 py-3 rounded-xl shadow-2xl toast flex items-center space-x-2 z-50';
             } else {
-                toast.className = 'fixed bottom-6 right-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-5 py-3 rounded-xl shadow-2xl toast flex items-center space-x-2';
+                toast.className = 'fixed top-6 right-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-5 py-3 rounded-xl shadow-2xl toast flex items-center space-x-2 z-50';
             }
             toastMessage.textContent = message;
             toast.classList.remove('hidden');
