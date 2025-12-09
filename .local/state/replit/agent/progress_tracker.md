@@ -37,3 +37,7 @@
 [x] 37. Added auto-update for DMARC prefix field - textarea updates automatically as user types
 [x] 38. Improved DMARC results layout with side-by-side design (results table left, output textarea right) to avoid scrolling
 [x] 39. Reinstalled packages and reconfigured workflow for Replit environment migration - application running successfully
+[x] 40. Optimized DMARC lookup speed with parallel processing (ThreadPoolExecutor) - up to 20 concurrent DNS lookups
+[x] 41. Added real-time progress display in loading overlay showing "Processing X/Y..." during DMARC lookups
+[x] 42. Reduced DNS resolver timeout from 5s to 2s for faster responses
+[x] 43. Implemented SSE (Server-Sent Events) endpoint for streaming DMARC progress updates

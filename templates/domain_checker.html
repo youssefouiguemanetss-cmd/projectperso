@@ -406,9 +406,10 @@
     </div>
 
     <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="glass-card rounded-2xl p-8 flex flex-col items-center">
+        <div class="glass-card rounded-2xl p-8 flex flex-col items-center min-w-64">
             <div class="loading-spinner w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full"></div>
-            <p class="mt-4 text-gray-700 font-semibold">Processing...</p>
+            <p id="loading-text" class="mt-4 text-gray-700 font-semibold">Processing...</p>
+            <p id="loading-progress" class="mt-2 text-purple-600 font-bold text-lg hidden"></p>
         </div>
     </div>
 
@@ -508,12 +509,22 @@
             document.getElementById('spf-distribute-toggle').classList.toggle('active', distributeIps);
         }
 
-        function showLoading() {
+        function showLoading(text = 'Processing...') {
+            document.getElementById('loading-text').textContent = text;
+            document.getElementById('loading-progress').classList.add('hidden');
+            document.getElementById('loading-progress').textContent = '';
             document.getElementById('loading-overlay').classList.remove('hidden');
+        }
+
+        function updateLoadingProgress(current, total) {
+            const progressEl = document.getElementById('loading-progress');
+            progressEl.textContent = `Processing ${current}/${total}...`;
+            progressEl.classList.remove('hidden');
         }
 
         function hideLoading() {
             document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('loading-progress').classList.add('hidden');
         }
 
         function showError(message) {
@@ -527,30 +538,37 @@
                 return;
             }
 
-            showLoading();
+            showLoading('Checking DMARC records...');
+            
             try {
-                const response = await fetch('/api/domain_checker/dmarc', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domains })
-                });
-
-                const data = await response.json();
-                if (data.error) {
-                    showError(data.error);
-                    return;
-                }
-
-                dmarcResults = data.results;
-                document.getElementById('dmarc-filter').value = 'all';
-                renderDmarcResults(dmarcResults);
-                updateDmarcOutput();
-
-                document.getElementById('dmarc-results').classList.remove('hidden');
+                const encodedDomains = encodeURIComponent(domains);
+                const eventSource = new EventSource(`/api/domain_checker/dmarc_stream?domains=${encodedDomains}`);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'progress') {
+                        updateLoadingProgress(data.current, data.total);
+                    } else if (data.type === 'complete') {
+                        eventSource.close();
+                        dmarcResults = data.results;
+                        document.getElementById('dmarc-filter').value = 'all';
+                        renderDmarcResults(dmarcResults);
+                        updateDmarcOutput();
+                        document.getElementById('dmarc-results').classList.remove('hidden');
+                        hideLoading();
+                        showToast(`Checked ${data.results.length} domains successfully!`, 'success');
+                    }
+                };
+                
+                eventSource.onerror = function(error) {
+                    eventSource.close();
+                    hideLoading();
+                    showError('Error connecting to server. Please try again.');
+                };
             } catch (error) {
-                showError('Error: ' + error.message);
-            } finally {
                 hideLoading();
+                showError('Error: ' + error.message);
             }
         }
         

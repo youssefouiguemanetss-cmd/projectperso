@@ -9,7 +9,8 @@ import json
 import re
 import time
 import dns.resolver
-from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response, stream_with_context
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from connection_manager import gmail_manager
 
@@ -1710,8 +1711,8 @@ def fetch_email_source(email_addr, app_password, uid):
 def get_dns_resolver():
     """Get a configured DNS resolver with timeout and reliable nameservers"""
     resolver = dns.resolver.Resolver()
-    resolver.timeout = 5
-    resolver.lifetime = 10
+    resolver.timeout = 2
+    resolver.lifetime = 3
     resolver.nameservers = ['8.8.8.8', '8.8.4.4', '1.1.1.1']
     return resolver
 
@@ -1794,7 +1795,7 @@ def domain_checker():
 @app.route('/api/domain_checker/dmarc', methods=['POST'])
 @login_required
 def api_dmarc_lookup():
-    """API endpoint for DMARC lookups"""
+    """API endpoint for DMARC lookups with parallel processing"""
     if not current_user.has_domain_checker_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
@@ -1803,15 +1804,88 @@ def api_dmarc_lookup():
     
     domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
     
-    results = []
-    for domain in domains:
-        dmarc_record = lookup_dmarc(domain)
-        results.append({
-            'domain': domain,
-            'dmarc': dmarc_record if dmarc_record else 'Not Found'
-        })
+    results = [None] * len(domains)
+    max_workers = min(20, len(domains)) if domains else 1
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {executor.submit(lookup_dmarc, domain): (i, domain) for i, domain in enumerate(domains)}
+        for future in as_completed(future_to_index):
+            idx, domain = future_to_index[future]
+            try:
+                dmarc_record = future.result()
+                results[idx] = {
+                    'domain': domain,
+                    'dmarc': dmarc_record if dmarc_record else 'Not Found'
+                }
+            except Exception:
+                results[idx] = {
+                    'domain': domain,
+                    'dmarc': 'Not Found'
+                }
     
     return jsonify({'results': results})
+
+@app.route('/api/domain_checker/dmarc_stream', methods=['GET'])
+@login_required
+def api_dmarc_lookup_stream():
+    """SSE endpoint for DMARC lookups with real-time progress"""
+    if not current_user.has_domain_checker_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    domains_text = request.args.get('domains', '')
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    def generate():
+        total = len(domains)
+        if total == 0:
+            yield f"data: {json.dumps({'type': 'complete', 'results': []})}\n\n"
+            return
+        
+        results = [None] * total
+        completed = 0
+        max_workers = min(20, total)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_index = {executor.submit(lookup_dmarc, domain): (i, domain) for i, domain in enumerate(domains)}
+            
+            for future in as_completed(future_to_index):
+                idx, domain = future_to_index[future]
+                try:
+                    dmarc_record = future.result()
+                    results[idx] = {
+                        'domain': domain,
+                        'dmarc': dmarc_record if dmarc_record else 'Not Found'
+                    }
+                except Exception:
+                    results[idx] = {
+                        'domain': domain,
+                        'dmarc': 'Not Found'
+                    }
+                
+                completed += 1
+                
+                progress_data = {
+                    'type': 'progress',
+                    'current': completed,
+                    'total': total,
+                    'domain': domain
+                }
+                yield f"data: {json.dumps(progress_data)}\n\n"
+        
+        complete_data = {
+            'type': 'complete',
+            'results': results
+        }
+        yield f"data: {json.dumps(complete_data)}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 @app.route('/api/domain_checker/dmarc_download', methods=['POST'])
 @login_required
