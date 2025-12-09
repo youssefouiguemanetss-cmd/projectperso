@@ -18,7 +18,7 @@ TSS1,thomas.chelbiii@gmail.com,vjfg ncqr mskp esor
 TSS1,smarout97@gmail.com,qihw iqpu uwaf vztm
 TSS1,daenerys.targaryen.west@gmail.com,vxox jksa megw fpdc
 
-TSS1,sonofragnarhakime@gmail.com,twlo rsee xvqe solb,news
+TSSW,sonofragnarhakime@gmail.com,twlo rsee xvqe solb,news
 
 
 EXTRACTION,sonofragnarhakime@gmail.com,twlo rsee xvqe solb,allow_extraction

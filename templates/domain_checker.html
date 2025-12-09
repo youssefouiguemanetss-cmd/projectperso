@@ -182,8 +182,8 @@
                             <label class="block text-sm font-semibold text-gray-700 mb-2 mt-4">
                                 <i class="fas fa-at mr-1"></i> Prefix (optional)
                             </label>
-                            <input type="text" id="dmarc-prefix" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none" placeholder="e.g., _dmarc (leave empty for default _dmarc)">
-                            <p class="mt-1 text-xs text-gray-500">Leave empty for _dmarc.domain format, or enter custom prefix. <span class="text-purple-600 font-medium">Auto-updates output as you type!</span></p>
+                            <input type="text" id="dmarc-prefix" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none" placeholder="Pleas Add Your Prefix Here">
+                            <p class="mt-1 text-xs text-gray-500">Leave empty if there is no Prefix, or enter custom prefix. <span class="text-purple-600 font-medium">Auto-updates output as you type!</span></p>
                         </div>
                     </div>
                     <div class="mt-4 flex space-x-3">
@@ -586,17 +586,18 @@
         }
         
         function updateDmarcOutput() {
-            const template = document.getElementById('dmarc-template').value.trim();
-            const prefix = document.getElementById('dmarc-prefix').value.trim() || '_dmarc';
-            const missing = dmarcResults.filter(r => r.dmarc === 'Not Found');
-            
-            const output = missing.map(r => {
-                const txtValue = template.replace(/\[domain\]/g, r.domain);
-                return `${r.domain},${prefix}.${r.domain},TXT,${txtValue}`;
-            }).join('\n');
-            
-            document.getElementById('dmarc-output').value = output;
-        }
+    const template = document.getElementById('dmarc-template').value.trim();
+    const prefix = document.getElementById('dmarc-prefix').value.trim(); // no fallback
+    const missing = dmarcResults.filter(r => r.dmarc === 'Not Found');
+    
+    const output = missing.map(r => {
+        const txtValue = template.replace(/\[domain\]/g, r.domain);
+        const fullHost = prefix ? `${prefix}.${r.domain}` : r.domain;
+        return `${r.domain},${fullHost},TXT,${txtValue}`;
+    }).join('\n');
+    
+    document.getElementById('dmarc-output').value = output;
+}
         
         function copyDmarcOutput() {
             const output = document.getElementById('dmarc-output').value;
