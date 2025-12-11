@@ -8,6 +8,7 @@ import logging
 import json
 import re
 import time
+import urllib.parse
 import dns.resolver
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response, stream_with_context
@@ -1983,12 +1984,21 @@ def api_spf_generate():
             else:
                 subdomains_for_domain = [s.strip() for s in a_subdomain_lines[-1].split(';') if s.strip()]
             
-            a_parts = ' '.join([f'a:{sub}.{domain}' for sub in subdomains_for_domain])
-            spf_record = f'v=spf1 {a_parts} -all'
+            # Get the prefix from prefixed_domains (format: prefix.domain or just domain)
+            full_domain = prefixed_domains[i] if i < len(prefixed_domains) and prefixed_domains else domain
             
-            first_subdomain = subdomains_for_domain[0] if subdomains_for_domain else 'mail'
-            subdomain_host = f'.{first_subdomain}.{domain}'
-            lines.append(f"{domain},{subdomain_host},TXT,{spf_record}")
+            # Build a: parts with subdomain.prefix.domain format
+            # Check if full_domain has a prefix (ends with .domain)
+            if full_domain.endswith('.' + domain) and full_domain != domain:
+                # Has prefix - extract it (e.g., mail.example.com -> mail)
+                prefix = full_domain[:-len('.' + domain)]
+                a_parts = ' '.join([f'a:{sub}.{prefix}.{domain}' for sub in subdomains_for_domain])
+            else:
+                # No prefix - just use subdomain.domain
+                a_parts = ' '.join([f'a:{sub}.{domain}' for sub in subdomains_for_domain])
+            
+            spf_record = f'v=spf1 {a_parts} -all'
+            lines.append(f"{domain},{full_domain},TXT,{spf_record}")
     
     elif spf_type == 'includes':
         include_domains_text = data.get('include_domains', '')
@@ -2006,7 +2016,8 @@ def api_spf_generate():
             include_parts = ' '.join([f'include:{inc}' for inc in includes_for_domain])
             spf_record = f'v=spf1 {include_parts} -all'
             
-            spf_subdomain = f'{domain}_spf.{domain}'
+            # Format: _spf.domain (no prefix before _spf)
+            spf_subdomain = f'_spf.{domain}'
             lines.append(f"{domain},{spf_subdomain},TXT,{spf_record}")
     
     else:
@@ -2072,6 +2083,57 @@ def api_mx_lookup():
     
     return jsonify({'results': results})
 
+@app.route('/api/domain_checker/mx_stream')
+@login_required
+def api_mx_stream():
+    """SSE endpoint for MX lookups with progress updates"""
+    if not current_user.has_domain_checker_permission:
+        return Response("Permission denied", status=403)
+    
+    domains_text = request.args.get('domains', '')
+    domains_text = urllib.parse.unquote(domains_text)
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    def generate():
+        total = len(domains)
+        results = [None] * total
+        completed = [0]
+        
+        max_workers = min(20, total) if total else 1
+        
+        def process_domain(idx, domain):
+            mx_records = lookup_mx(domain)
+            return idx, {
+                'domain': domain,
+                'mx': mx_records if mx_records else ['Not Found']
+            }
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_idx = {executor.submit(process_domain, i, d): i for i, d in enumerate(domains)}
+            for future in as_completed(future_to_idx):
+                try:
+                    idx, result = future.result()
+                    results[idx] = result
+                    completed[0] += 1
+                    yield f"data: {json.dumps({'type': 'progress', 'current': completed[0], 'total': total})}\n\n"
+                except Exception:
+                    idx = future_to_idx[future]
+                    results[idx] = {'domain': domains[idx], 'mx': ['Not Found']}
+                    completed[0] += 1
+                    yield f"data: {json.dumps({'type': 'progress', 'current': completed[0], 'total': total})}\n\n"
+        
+        yield f"data: {json.dumps({'type': 'complete', 'results': results})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
+
 @app.route('/api/domain_checker/txt', methods=['POST'])
 @login_required
 def api_txt_lookup():
@@ -2093,6 +2155,57 @@ def api_txt_lookup():
         })
     
     return jsonify({'results': results})
+
+@app.route('/api/domain_checker/txt_stream')
+@login_required
+def api_txt_stream():
+    """SSE endpoint for TXT lookups with progress updates"""
+    if not current_user.has_domain_checker_permission:
+        return Response("Permission denied", status=403)
+    
+    domains_text = request.args.get('domains', '')
+    domains_text = urllib.parse.unquote(domains_text)
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    def generate():
+        total = len(domains)
+        results = [None] * total
+        completed = [0]
+        
+        max_workers = min(20, total) if total else 1
+        
+        def process_domain(idx, domain):
+            txt_records = lookup_txt(domain)
+            return idx, {
+                'domain': domain,
+                'txt': txt_records if txt_records else ['Not Found']
+            }
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_idx = {executor.submit(process_domain, i, d): i for i, d in enumerate(domains)}
+            for future in as_completed(future_to_idx):
+                try:
+                    idx, result = future.result()
+                    results[idx] = result
+                    completed[0] += 1
+                    yield f"data: {json.dumps({'type': 'progress', 'current': completed[0], 'total': total})}\n\n"
+                except Exception:
+                    idx = future_to_idx[future]
+                    results[idx] = {'domain': domains[idx], 'txt': ['Not Found']}
+                    completed[0] += 1
+                    yield f"data: {json.dumps({'type': 'progress', 'current': completed[0], 'total': total})}\n\n"
+        
+        yield f"data: {json.dumps({'type': 'complete', 'results': results})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

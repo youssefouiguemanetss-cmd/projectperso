@@ -894,29 +894,36 @@
                 return;
             }
 
-            showLoading();
+            showLoading('Checking MX records...');
+            
             try {
-                const response = await fetch('/api/domain_checker/mx', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domains })
-                });
-
-                const data = await response.json();
-                if (data.error) {
-                    showError(data.error);
-                    return;
-                }
-
-                mxResults = data.results;
-                document.getElementById('mx-filter').value = 'all';
-                renderMxResults(mxResults);
-
-                document.getElementById('mx-results').classList.remove('hidden');
+                const encodedDomains = encodeURIComponent(domains);
+                const eventSource = new EventSource(`/api/domain_checker/mx_stream?domains=${encodedDomains}`);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'progress') {
+                        updateLoadingProgress(data.current, data.total);
+                    } else if (data.type === 'complete') {
+                        eventSource.close();
+                        mxResults = data.results;
+                        document.getElementById('mx-filter').value = 'all';
+                        renderMxResults(mxResults);
+                        document.getElementById('mx-results').classList.remove('hidden');
+                        hideLoading();
+                        showToast(`Checked ${data.results.length} domains successfully!`, 'success');
+                    }
+                };
+                
+                eventSource.onerror = function(error) {
+                    eventSource.close();
+                    hideLoading();
+                    showError('Error connecting to server. Please try again.');
+                };
             } catch (error) {
-                showError('Error: ' + error.message);
-            } finally {
                 hideLoading();
+                showError('Error: ' + error.message);
             }
         }
         
@@ -973,29 +980,36 @@
                 return;
             }
 
-            showLoading();
+            showLoading('Checking TXT records...');
+            
             try {
-                const response = await fetch('/api/domain_checker/txt', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domains })
-                });
-
-                const data = await response.json();
-                if (data.error) {
-                    showError(data.error);
-                    return;
-                }
-
-                txtResults = data.results;
-                document.getElementById('txt-filter').value = 'all';
-                renderTxtResults(txtResults);
-
-                document.getElementById('txt-results').classList.remove('hidden');
+                const encodedDomains = encodeURIComponent(domains);
+                const eventSource = new EventSource(`/api/domain_checker/txt_stream?domains=${encodedDomains}`);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'progress') {
+                        updateLoadingProgress(data.current, data.total);
+                    } else if (data.type === 'complete') {
+                        eventSource.close();
+                        txtResults = data.results;
+                        document.getElementById('txt-filter').value = 'all';
+                        renderTxtResults(txtResults);
+                        document.getElementById('txt-results').classList.remove('hidden');
+                        hideLoading();
+                        showToast(`Checked ${data.results.length} domains successfully!`, 'success');
+                    }
+                };
+                
+                eventSource.onerror = function(error) {
+                    eventSource.close();
+                    hideLoading();
+                    showError('Error connecting to server. Please try again.');
+                };
             } catch (error) {
-                showError('Error: ' + error.message);
-            } finally {
                 hideLoading();
+                showError('Error: ' + error.message);
             }
         }
         

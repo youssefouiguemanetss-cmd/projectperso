@@ -49,6 +49,11 @@
 [x] 49. SPF: Added three mutually exclusive record type options (IPs, A records, Includes)
 [x] 50. Updated backend API to support new SPF generation with A records and Includes
 [x] 51. Fixed prefixed domains handling for single-prefix mode and non-IP SPF types
-[x] 52. Reinstalled Python packages after environment reset
-[x] 53. Restarted workflow - application running successfully on port 5000
-[x] 54. Verified TSS Gmail Access login page displays correctly - import migration complete
+[x] 52. Fixed A records SPF format: now outputs prefix.domain,TXT,v=spf1 a:subdomain.prefix.domain -all
+[x] 53. Fixed Include records format: now outputs _spf.domain,TXT,v=spf1 include:domain1 include:domain2 -all (no prefix before _spf)
+[x] 54. Added parallel processing for MX lookups with ThreadPoolExecutor (up to 20 concurrent lookups)
+[x] 55. Added parallel processing for TXT lookups with ThreadPoolExecutor (up to 20 concurrent lookups)
+[x] 56. Added SSE streaming endpoints for MX and TXT lookups with real-time progress display
+[x] 57. Updated frontend MX lookup to use streaming endpoint with "Processing X/Y..." progress display
+[x] 58. Updated frontend TXT lookup to use streaming endpoint with "Processing X/Y..." progress display
+[x] 59. MX and TXT lookups now have copy filtered domains button (already implemented)
