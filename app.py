@@ -1912,59 +1912,105 @@ def api_dmarc_download():
 @app.route('/api/domain_checker/spf_generate', methods=['POST'])
 @login_required
 def api_spf_generate():
-    """Generate SPF records with dual input system for domains and prefixed domains"""
+    """Generate SPF records with support for IPs, A records, and Include records"""
     if not current_user.has_domain_checker_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
     data = request.get_json()
     domains_text = data.get('domains', '')
     prefixed_domains_text = data.get('prefixed_domains', '')
-    ips_text = data.get('ips', '')
+    spf_type = data.get('spf_type', 'ips')
     distribute = data.get('distribute', False)
     
     domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
     prefixed_domains = [d.strip().lower() for d in prefixed_domains_text.strip().split('\n') if d.strip()]
-    ips = [ip.strip() for ip in ips_text.strip().split('\n') if ip.strip() and is_valid_ip(ip.strip())]
     
     if not domains:
         return jsonify({'error': 'No valid domains provided'}), 400
-    if not ips:
-        return jsonify({'error': 'No valid IP addresses provided'}), 400
     
-    if prefixed_domains and len(prefixed_domains) != len(domains):
+    if spf_type == 'ips' and prefixed_domains and len(prefixed_domains) != len(domains):
         return jsonify({'error': f'Number of prefixed domains ({len(prefixed_domains)}) must match number of domains ({len(domains)})'}), 400
     
     warning = None
-    if len(ips) > 50:
-        warning = f"Warning: {len(ips)} IPs provided. This may exceed SPF lookup limits."
-    
     lines = []
     
-    if distribute:
-        if len(ips) < len(domains):
-            return jsonify({'error': f'Not enough IPs ({len(ips)}) to distribute among {len(domains)} domains'}), 400
+    if spf_type == 'ips':
+        ips_text = data.get('ips', '')
+        ips = [ip.strip() for ip in ips_text.strip().split('\n') if ip.strip() and is_valid_ip(ip.strip())]
         
-        ips_per_domain = len(ips) // len(domains)
-        extra_ips = len(ips) % len(domains)
-        ip_index = 0
+        if not ips:
+            return jsonify({'error': 'No valid IP addresses provided'}), 400
         
-        for i, domain in enumerate(domains):
-            count = ips_per_domain + (1 if i < extra_ips else 0)
-            domain_ips = ips[ip_index:ip_index + count]
-            ip_index += count
+        if len(ips) > 50:
+            warning = f"Warning: {len(ips)} IPs provided. This may exceed SPF lookup limits."
+        
+        if distribute:
+            if len(ips) < len(domains):
+                return jsonify({'error': f'Not enough IPs ({len(ips)}) to distribute among {len(domains)} domains'}), 400
             
-            ip_parts = ' '.join([f'ip4:{ip}' for ip in domain_ips])
+            ips_per_domain = len(ips) // len(domains)
+            extra_ips = len(ips) % len(domains)
+            ip_index = 0
+            
+            for i, domain in enumerate(domains):
+                count = ips_per_domain + (1 if i < extra_ips else 0)
+                domain_ips = ips[ip_index:ip_index + count]
+                ip_index += count
+                
+                ip_parts = ' '.join([f'ip4:{ip}' for ip in domain_ips])
+                spf_record = f'v=spf1 {ip_parts} -all'
+                
+                full_domain = prefixed_domains[i] if prefixed_domains else domain
+                lines.append(f"{domain},{full_domain},TXT,{spf_record}")
+        else:
+            ip_parts = ' '.join([f'ip4:{ip}' for ip in ips])
             spf_record = f'v=spf1 {ip_parts} -all'
             
-            full_domain = prefixed_domains[i] if prefixed_domains else domain
-            lines.append(f"{domain},{full_domain},TXT,{spf_record}")
-    else:
-        ip_parts = ' '.join([f'ip4:{ip}' for ip in ips])
-        spf_record = f'v=spf1 {ip_parts} -all'
+            for i, domain in enumerate(domains):
+                full_domain = prefixed_domains[i] if prefixed_domains else domain
+                lines.append(f"{domain},{full_domain},TXT,{spf_record}")
+    
+    elif spf_type == 'a_records':
+        a_subdomains_text = data.get('a_subdomains', '')
+        a_subdomain_lines = [line.strip() for line in a_subdomains_text.strip().split('\n') if line.strip()]
+        
+        if not a_subdomain_lines:
+            return jsonify({'error': 'No subdomains provided for A records'}), 400
         
         for i, domain in enumerate(domains):
-            full_domain = prefixed_domains[i] if prefixed_domains else domain
-            lines.append(f"{domain},{full_domain},TXT,{spf_record}")
+            if i < len(a_subdomain_lines):
+                subdomains_for_domain = [s.strip() for s in a_subdomain_lines[i].split(';') if s.strip()]
+            else:
+                subdomains_for_domain = [s.strip() for s in a_subdomain_lines[-1].split(';') if s.strip()]
+            
+            a_parts = ' '.join([f'a:{sub}.{domain}' for sub in subdomains_for_domain])
+            spf_record = f'v=spf1 {a_parts} -all'
+            
+            first_subdomain = subdomains_for_domain[0] if subdomains_for_domain else 'mail'
+            subdomain_host = f'.{first_subdomain}.{domain}'
+            lines.append(f"{domain},{subdomain_host},TXT,{spf_record}")
+    
+    elif spf_type == 'includes':
+        include_domains_text = data.get('include_domains', '')
+        include_domain_lines = [line.strip() for line in include_domains_text.strip().split('\n') if line.strip()]
+        
+        if not include_domain_lines:
+            return jsonify({'error': 'No include domains provided'}), 400
+        
+        for i, domain in enumerate(domains):
+            if i < len(include_domain_lines):
+                includes_for_domain = [s.strip() for s in include_domain_lines[i].split(';') if s.strip()]
+            else:
+                includes_for_domain = [s.strip() for s in include_domain_lines[-1].split(';') if s.strip()]
+            
+            include_parts = ' '.join([f'include:{inc}' for inc in includes_for_domain])
+            spf_record = f'v=spf1 {include_parts} -all'
+            
+            spf_subdomain = f'{domain}_spf.{domain}'
+            lines.append(f"{domain},{spf_subdomain},TXT,{spf_record}")
+    
+    else:
+        return jsonify({'error': 'Invalid SPF type specified'}), 400
     
     return jsonify({'content': '\n'.join(lines), 'count': len(lines), 'warning': warning})
 

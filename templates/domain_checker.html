@@ -203,6 +203,9 @@
                                             <option value="found">Found</option>
                                             <option value="not_found">Not Found</option>
                                         </select>
+                                        <button onclick="copyDmarcFilteredDomains()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                                            <i class="fas fa-copy mr-2"></i>Copy Domains
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="overflow-x-auto max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
@@ -233,7 +236,7 @@
                 </div>
 
                 <div id="tab-spf" class="tab-content hidden">
-                    <div class="grid grid-cols-3 gap-6">
+                    <div class="grid grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
                                 <i class="fas fa-list mr-1"></i> Domains (one per line)
@@ -242,24 +245,65 @@
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-at mr-1"></i> Prefixed Domains (one per line)
+                                <i class="fas fa-at mr-1"></i> Prefix
                             </label>
-                            <textarea id="spf-prefixed-domains" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="mail.example.com&#10;domain.org&#10;smtp.website.net"></textarea>
-                            <p class="mt-1 text-xs text-gray-500">Match line-by-line with domains. Repeat domain if no prefix needed.</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-network-wired mr-1"></i> IP Addresses (one per line)
-                            </label>
-                            <textarea id="spf-ips" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="1.2.3.4&#10;5.6.7.8"></textarea>
+                            <div class="flex items-center space-x-3 mb-2">
+                                <input type="checkbox" id="spf-single-prefix" class="w-4 h-4 text-purple-600 rounded" onchange="toggleSinglePrefix()">
+                                <label for="spf-single-prefix" class="text-sm text-gray-600">Use single prefix for all domains</label>
+                            </div>
+                            <input type="text" id="spf-prefix-input" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none hidden" placeholder="Enter prefix (e.g., mail)">
+                            <textarea id="spf-prefixed-domains" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="mail.example.com&#10;domain.org&#10;smtp.website.net"></textarea>
+                            <p id="spf-prefix-hint" class="mt-1 text-xs text-gray-500">Match line-by-line with domains. Repeat domain if no prefix needed.</p>
                         </div>
                     </div>
-                    <div class="mt-4 flex items-center space-x-6">
-                        <div class="flex items-center space-x-3">
+                    
+                    <div class="mt-6 p-4 bg-gray-50 rounded-xl">
+                        <label class="block text-sm font-semibold text-gray-700 mb-3">
+                            <i class="fas fa-cog mr-1"></i> SPF Record Type (choose one)
+                        </label>
+                        <div class="flex items-center space-x-6">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="spf-type" value="ips" checked class="w-4 h-4 text-purple-600" onchange="toggleSpfType('ips')">
+                                <span class="text-sm font-medium text-gray-700">IP Addresses</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="spf-type" value="a_records" class="w-4 h-4 text-purple-600" onchange="toggleSpfType('a_records')">
+                                <span class="text-sm font-medium text-gray-700">A Records</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="radio" name="spf-type" value="includes" class="w-4 h-4 text-purple-600" onchange="toggleSpfType('includes')">
+                                <span class="text-sm font-medium text-gray-700">Include Records</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="spf-ips-section" class="mt-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-network-wired mr-1"></i> IP Addresses (one per line, or semicolon-separated per domain)
+                        </label>
+                        <textarea id="spf-ips" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="1.2.3.4&#10;5.6.7.8&#10;or per domain: 1.2.3.4;5.6.7.8"></textarea>
+                        <div class="mt-3 flex items-center space-x-3">
                             <div id="spf-distribute-toggle" class="toggle-switch" onclick="toggleDistribute()"></div>
                             <label class="text-sm font-semibold text-gray-700">Distribute IPs Equally Per Domain</label>
                         </div>
                     </div>
+                    
+                    <div id="spf-a-section" class="mt-4 hidden">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-server mr-1"></i> Subdomains for A Records (one per line, or semicolon-separated per domain)
+                        </label>
+                        <textarea id="spf-a-subdomains" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="mail&#10;smtp&#10;or per domain: mail;smtp"></textarea>
+                        <p class="mt-1 text-xs text-gray-500">Enter subdomain names. Output format: [domain],.subdomain.[domain],TXT,v=spf1 a:subdomain.[domain] -all</p>
+                    </div>
+                    
+                    <div id="spf-includes-section" class="mt-4 hidden">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-link mr-1"></i> Include Domains (one per line, or semicolon-separated for multiple includes)
+                        </label>
+                        <textarea id="spf-include-domains" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="spf.google.com&#10;or multiple: spf.google.com;spf.protection.outlook.com"></textarea>
+                        <p class="mt-1 text-xs text-gray-500">Enter include domains. Use semicolons to add multiple includes for the same domain line.</p>
+                    </div>
+                    
                     <div class="mt-4">
                         <button onclick="generateSpf()" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center">
                             <i class="fas fa-cog mr-2"></i>Generate SPF Records
@@ -420,6 +464,8 @@
         let dmarcResults = [];
         let mxResults = [];
         let txtResults = [];
+        let spfType = 'ips';
+        let singlePrefixMode = false;
         
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
@@ -625,15 +671,125 @@
             }
             copyToClipboard(output);
         }
+        
+        function copyDmarcFilteredDomains() {
+            const filter = document.getElementById('dmarc-filter').value;
+            let filtered = dmarcResults;
+            if (filter === 'found') {
+                filtered = dmarcResults.filter(r => r.dmarc !== 'Not Found');
+            } else if (filter === 'not_found') {
+                filtered = dmarcResults.filter(r => r.dmarc === 'Not Found');
+            }
+            const domains = filtered.map(r => r.domain).join('\n');
+            if (!domains) {
+                showToast('No domains to copy', 'warning');
+                return;
+            }
+            copyToClipboard(domains);
+        }
+        
+        function toggleSinglePrefix() {
+            singlePrefixMode = document.getElementById('spf-single-prefix').checked;
+            const prefixInput = document.getElementById('spf-prefix-input');
+            const prefixedDomains = document.getElementById('spf-prefixed-domains');
+            const prefixHint = document.getElementById('spf-prefix-hint');
+            
+            if (singlePrefixMode) {
+                prefixInput.classList.remove('hidden');
+                prefixedDomains.classList.add('hidden');
+                prefixHint.textContent = 'Leave empty for no prefix, or enter a prefix to apply to all domains.';
+            } else {
+                prefixInput.classList.add('hidden');
+                prefixedDomains.classList.remove('hidden');
+                prefixHint.textContent = 'Match line-by-line with domains. Repeat domain if no prefix needed.';
+            }
+        }
+        
+        function toggleSpfType(type) {
+            spfType = type;
+            document.getElementById('spf-ips-section').classList.add('hidden');
+            document.getElementById('spf-a-section').classList.add('hidden');
+            document.getElementById('spf-includes-section').classList.add('hidden');
+            
+            if (type === 'ips') {
+                document.getElementById('spf-ips-section').classList.remove('hidden');
+            } else if (type === 'a_records') {
+                document.getElementById('spf-a-section').classList.remove('hidden');
+            } else if (type === 'includes') {
+                document.getElementById('spf-includes-section').classList.remove('hidden');
+            }
+        }
+        
+        function getValidPrefixedDomains(domains, prefixedDomainsText, singlePrefix) {
+            const domainLines = domains.split('\n').filter(d => d.trim());
+            if (singlePrefix !== null && singlePrefix !== undefined) {
+                if (singlePrefix.trim()) {
+                    return domainLines.map(d => singlePrefix.trim() + '.' + d.trim()).join('\n');
+                } else {
+                    return domainLines.map(d => d.trim()).join('\n');
+                }
+            } else {
+                const prefixedLines = prefixedDomainsText.split('\n').filter(d => d.trim());
+                if (prefixedLines.length === 0) {
+                    return domainLines.map(d => d.trim()).join('\n');
+                }
+                const result = [];
+                for (let i = 0; i < domainLines.length; i++) {
+                    if (i < prefixedLines.length) {
+                        result.push(prefixedLines[i].trim());
+                    } else {
+                        result.push(domainLines[i].trim());
+                    }
+                }
+                return result.join('\n');
+            }
+        }
 
         async function generateSpf() {
             const domains = document.getElementById('spf-domains').value.trim();
-            const prefixedDomains = document.getElementById('spf-prefixed-domains').value.trim();
-            const ips = document.getElementById('spf-ips').value.trim();
-
-            if (!domains || !ips) {
-                showError('Please enter domains and IP addresses');
+            
+            if (!domains) {
+                showError('Please enter at least one domain');
                 return;
+            }
+            
+            let prefixedDomains = '';
+            if (singlePrefixMode) {
+                const singlePrefix = document.getElementById('spf-prefix-input').value.trim();
+                prefixedDomains = getValidPrefixedDomains(domains, '', singlePrefix);
+            } else {
+                const prefixedDomainsText = document.getElementById('spf-prefixed-domains').value.trim();
+                prefixedDomains = getValidPrefixedDomains(domains, prefixedDomainsText, null);
+            }
+            
+            let requestData = {
+                domains,
+                prefixed_domains: prefixedDomains,
+                spf_type: spfType,
+                distribute: spfType === 'ips' ? distributeIps : false
+            };
+            
+            if (spfType === 'ips') {
+                const ips = document.getElementById('spf-ips').value.trim();
+                if (!ips) {
+                    showError('Please enter IP addresses');
+                    return;
+                }
+                requestData.ips = ips;
+            } else if (spfType === 'a_records') {
+                const subdomains = document.getElementById('spf-a-subdomains').value.trim();
+                if (!subdomains) {
+                    showError('Please enter subdomains for A records');
+                    return;
+                }
+                requestData.a_subdomains = subdomains;
+            } else if (spfType === 'includes') {
+                const includeDomains = document.getElementById('spf-include-domains').value.trim();
+                if (!includeDomains) {
+                    showError('Please enter include domains');
+                    return;
+                }
+                requestData.include_domains = includeDomains;
             }
 
             showLoading();
@@ -641,7 +797,7 @@
                 const response = await fetch('/api/domain_checker/spf_generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domains, prefixed_domains: prefixedDomains, ips, distribute: distributeIps })
+                    body: JSON.stringify(requestData)
                 });
 
                 const data = await response.json();

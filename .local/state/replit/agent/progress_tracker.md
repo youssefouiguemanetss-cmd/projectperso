@@ -44,3 +44,8 @@
 [x] 44. Reinstalled Python packages and reconfigured workflow with webview output for Replit environment
 [x] 45. Application running successfully on port 5000 - workflow status: RUNNING
 [x] 46. Import migration to Replit environment completed - all systems operational
+[x] 47. DMARC: Added copy button for filtered domains in results section
+[x] 48. SPF: Added single prefix checkbox option - applies same prefix to all domains when checked
+[x] 49. SPF: Added three mutually exclusive record type options (IPs, A records, Includes)
+[x] 50. Updated backend API to support new SPF generation with A records and Includes
+[x] 51. Fixed prefixed domains handling for single-prefix mode and non-IP SPF types
