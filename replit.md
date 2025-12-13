@@ -99,11 +99,24 @@ Visual identification in Gmail account dropdown menu:
     - `Domain_checker` (access Domain Checker service)
     - `find_news` (access Find News service)
     - `Extract_emails` (access Extract Emails service)
+    - `tssw_report` (access TSSW Rapport service)
   - Multiple permissions separated by comma
 - **gmailaccounts.txt**: Format: `Entity,EmailAddress,AppPassword[,news]` (one per line)
   - Add `,news` suffix to mark accounts for the "Find News" service
 
 ## Recent Changes (December 2025)
+
+### Domain Checker Enhancements and TSSW Rapport (December 13, 2025)
+- ✅ Domain Checker: Added SPF A Records subdomain validation (requires 1 line for all domains OR exact count matching domains)
+- ✅ Domain Checker: Created unified Domain Lookup tab merging MX/TXT tabs with checkboxes for MX, TXT, SPF, A Records
+- ✅ Domain Lookup: Implemented SSE streaming with parallel processing (ThreadPoolExecutor, 20 concurrent queries)
+- ✅ Domain Lookup: Fixed scrollable results table (400px height) with per-type filter dropdowns
+- ✅ Domain Lookup: Added color-coded badges (green for Found, red for Not Found) and column visibility toggles
+- ✅ Domain Lookup: Added quick stats summary and CSV export for filtered/visible results
+- ✅ Domain Lookup: Added search by domain functionality
+- ✅ New TSSW Rapport service with `tssw_report` permission check
+- ✅ Created `/tssw_rapport` route and template with permission-gated access
+- ✅ Added TSSW Rapport service card to services page (visible only with tssw_report permission)
 
 ### Performance and Permission Updates (December 8, 2025)
 - ✅ Optimized login/logout by removing Gmail connection manager calls (faster authentication)
