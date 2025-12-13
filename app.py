@@ -1992,10 +1992,10 @@ def api_spf_generate():
             if full_domain.endswith('.' + domain) and full_domain != domain:
                 # Has prefix - extract it (e.g., mail.example.com -> mail)
                 prefix = full_domain[:-len('.' + domain)]
-                a_parts = ' '.join([f'a:{sub}.{prefix}.{domain}' for sub in subdomains_for_domain])
+                a_parts = ' '.join([f'a:{sub}' for sub in subdomains_for_domain])
             else:
                 # No prefix - just use subdomain.domain
-                a_parts = ' '.join([f'a:{sub}.{domain}' for sub in subdomains_for_domain])
+                a_parts = ' '.join([f'a:{sub}' for sub in subdomains_for_domain])
             
             spf_record = f'v=spf1 {a_parts} -all'
             lines.append(f"{domain},{full_domain},TXT,{spf_record}")
@@ -2018,7 +2018,8 @@ def api_spf_generate():
             
             # Format: _spf.domain (no prefix before _spf)
             spf_subdomain = f'_spf.{domain}'
-            lines.append(f"{domain},{spf_subdomain},TXT,{spf_record}")
+            full_domain = prefixed_domains[i] if i < len(prefixed_domains) and prefixed_domains else domain
+            lines.append(f"{domain},{full_domain},TXT,{spf_record}")
     
     else:
         return jsonify({'error': 'Invalid SPF type specified'}), 400

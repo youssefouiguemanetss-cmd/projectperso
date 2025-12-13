@@ -245,13 +245,13 @@
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                <i class="fas fa-at mr-1"></i> Prefix
+                                <i class="fas fa-at mr-1"></i> Subdomain
                             </label>
                             <div class="flex items-center space-x-3 mb-2">
                                 <input type="checkbox" id="spf-single-prefix" class="w-4 h-4 text-purple-600 rounded" onchange="toggleSinglePrefix()">
-                                <label for="spf-single-prefix" class="text-sm text-gray-600">Use single prefix for all domains</label>
+                                <label for="spf-single-prefix" class="text-sm text-gray-600">Use single Subdomain for all domains</label>
                             </div>
-                            <input type="text" id="spf-prefix-input" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none hidden" placeholder="Enter prefix (e.g., mail)">
+                            <input type="text" id="spf-prefix-input" class="input-modern w-full px-4 py-3 rounded-xl focus:outline-none hidden" placeholder="Enter subdomain (e.g., mail.example.com)">
                             <textarea id="spf-prefixed-domains" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="mail.example.com&#10;domain.org&#10;smtp.website.net"></textarea>
                             <p id="spf-prefix-hint" class="mt-1 text-xs text-gray-500">Match line-by-line with domains. Repeat domain if no prefix needed.</p>
                         </div>
@@ -290,7 +290,7 @@
                     
                     <div id="spf-a-section" class="mt-4 hidden">
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="fas fa-server mr-1"></i> Subdomains for A Records (one per line, or semicolon-separated per domain)
+                            <i class="fas fa-server mr-1"></i> Prefix for A Records (one per line, or semicolon-separated per domain)
                         </label>
                         <textarea id="spf-a-subdomains" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="mail&#10;smtp&#10;or per domain: mail;smtp"></textarea>
                         <p class="mt-1 text-xs text-gray-500">Enter subdomain names. Output format: [domain],.subdomain.[domain],TXT,v=spf1 a:subdomain.[domain] -all</p>
@@ -697,11 +697,11 @@
             if (singlePrefixMode) {
                 prefixInput.classList.remove('hidden');
                 prefixedDomains.classList.add('hidden');
-                prefixHint.textContent = 'Leave empty for no prefix, or enter a prefix to apply to all domains.';
+                prefixHint.textContent = 'Leave empty for no Subdomain, or enter a Subdomain to apply to all domains.';
             } else {
                 prefixInput.classList.add('hidden');
                 prefixedDomains.classList.remove('hidden');
-                prefixHint.textContent = 'Match line-by-line with domains. Repeat domain if no prefix needed.';
+                prefixHint.textContent = 'Match line-by-line with domains. Repeat domain if no Subdomain needed.';
             }
         }
         
