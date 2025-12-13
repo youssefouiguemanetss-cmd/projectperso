@@ -36,7 +36,7 @@ login_manager.login_message_category = 'info'
 
 # User class for Flask-Login
 class User(UserMixin):
-    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False):
+    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False, has_tssw_report_permission=False):
         self.id = username
         self.username = username
         self.entity = entity
@@ -46,6 +46,7 @@ class User(UserMixin):
         self.has_domain_checker_permission = has_domain_checker_permission
         self.has_find_news_permission = has_find_news_permission
         self.has_extract_emails_permission = has_extract_emails_permission
+        self.has_tssw_report_permission = has_tssw_report_permission
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -60,8 +61,9 @@ def load_user(user_id):
         has_domain_checker = user_data['has_domain_checker_permission']
         has_find_news = user_data['has_find_news_permission']
         has_extract_emails = user_data['has_extract_emails_permission']
+        has_tssw_report = user_data['has_tssw_report_permission']
         if username == user_id:
-            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails)
+            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report)
     return None
 
 def load_users_from_file():
@@ -85,6 +87,7 @@ def load_users_from_file():
                             has_domain_checker = 'Domain_checker' in permissions
                             has_find_news = 'find_news' in permissions
                             has_extract_emails = 'Extract_emails' in permissions
+                            has_tssw_report = 'tssw_report' in permissions
                             users.append({
                                 'entity': entity,
                                 'name': name,
@@ -95,7 +98,8 @@ def load_users_from_file():
                                 'has_news_permission': has_news,
                                 'has_domain_checker_permission': has_domain_checker,
                                 'has_find_news_permission': has_find_news,
-                                'has_extract_emails_permission': has_extract_emails
+                                'has_extract_emails_permission': has_extract_emails,
+                                'has_tssw_report_permission': has_tssw_report
                             })
                         else:
                             logging.warning(f"Invalid format in users.txt line {line_num}: {line}")
@@ -1978,6 +1982,10 @@ def api_spf_generate():
         if not a_subdomain_lines:
             return jsonify({'error': 'No subdomains provided for A records'}), 400
         
+        # Validate subdomain lines count: must be exactly 1 OR equal to number of domains
+        if len(a_subdomain_lines) != 1 and len(a_subdomain_lines) != len(domains):
+            return jsonify({'error': f'Number of subdomain lines ({len(a_subdomain_lines)}) must be either 1 (to apply to all domains) or exactly {len(domains)} (to match each domain)'}), 400
+        
         for i, domain in enumerate(domains):
             if i < len(a_subdomain_lines):
                 subdomains_for_domain = [s.strip() for s in a_subdomain_lines[i].split(';') if s.strip()]
@@ -2193,6 +2201,131 @@ def api_txt_stream():
                 except Exception:
                     idx = future_to_idx[future]
                     results[idx] = {'domain': domains[idx], 'txt': ['Not Found']}
+                    completed[0] += 1
+                    yield f"data: {json.dumps({'type': 'progress', 'current': completed[0], 'total': total})}\n\n"
+        
+        yield f"data: {json.dumps({'type': 'complete', 'results': results})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
+
+@app.route('/tssw_rapport')
+@login_required
+def tssw_rapport():
+    """TSSW Rapport service - only for users with tssw_report permission"""
+    if not current_user.has_tssw_report_permission:
+        flash('You do not have permission to access this service.', 'error')
+        return redirect(url_for('services'))
+    return render_template('tssw_rapport.html', current_user=current_user)
+
+@app.route('/api/domain_checker/unified_lookup')
+@login_required
+def api_unified_lookup():
+    """SSE endpoint for unified domain lookup with MX, TXT, SPF, A IP records"""
+    if not current_user.has_domain_checker_permission:
+        return Response("Permission denied", status=403)
+    
+    domains_text = request.args.get('domains', '')
+    domains_text = urllib.parse.unquote(domains_text)
+    check_mx = request.args.get('check_mx', 'false') == 'true'
+    check_txt = request.args.get('check_txt', 'false') == 'true'
+    check_spf = request.args.get('check_spf', 'false') == 'true'
+    check_a = request.args.get('check_a', 'false') == 'true'
+    
+    domains = [d.strip().lower() for d in domains_text.strip().split('\n') if d.strip()]
+    
+    def lookup_a_records(domain):
+        """Lookup A records (IP addresses) for a domain"""
+        try:
+            resolver = get_dns_resolver()
+            answers = resolver.resolve(domain, 'A')
+            return [str(rdata) for rdata in answers]
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.Timeout):
+            return None
+        except Exception as e:
+            logging.debug(f"A lookup error for {domain}: {e}")
+            return None
+    
+    def lookup_spf_record(domain):
+        """Lookup SPF record for a domain"""
+        try:
+            resolver = get_dns_resolver()
+            answers = resolver.resolve(domain, 'TXT')
+            for rdata in answers:
+                txt_parts = []
+                for s in rdata.strings:
+                    if isinstance(s, bytes):
+                        txt_parts.append(s.decode('utf-8', errors='replace'))
+                    else:
+                        txt_parts.append(str(s))
+                txt_value = ''.join(txt_parts)
+                if txt_value.lower().startswith('v=spf1'):
+                    return txt_value
+            return None
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.resolver.Timeout):
+            return None
+        except Exception as e:
+            logging.debug(f"SPF lookup error for {domain}: {e}")
+            return None
+    
+    def process_domain(idx, domain):
+        result = {'domain': domain}
+        if check_mx:
+            mx_records = lookup_mx(domain)
+            result['mx'] = mx_records if mx_records else None
+            result['mx_found'] = mx_records is not None and len(mx_records) > 0
+        if check_txt:
+            txt_records = lookup_txt(domain)
+            result['txt'] = txt_records if txt_records else None
+            result['txt_found'] = txt_records is not None and len(txt_records) > 0
+        if check_spf:
+            spf_record = lookup_spf_record(domain)
+            result['spf'] = spf_record
+            result['spf_found'] = spf_record is not None
+        if check_a:
+            a_records = lookup_a_records(domain)
+            result['a'] = a_records if a_records else None
+            result['a_found'] = a_records is not None and len(a_records) > 0
+        return idx, result
+    
+    def generate():
+        total = len(domains)
+        results = [None] * total
+        completed = [0]
+        
+        max_workers = min(20, total) if total else 1
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_idx = {executor.submit(process_domain, i, d): i for i, d in enumerate(domains)}
+            for future in as_completed(future_to_idx):
+                try:
+                    idx, result = future.result()
+                    results[idx] = result
+                    completed[0] += 1
+                    yield f"data: {json.dumps({'type': 'progress', 'current': completed[0], 'total': total})}\n\n"
+                except Exception:
+                    idx = future_to_idx[future]
+                    result = {'domain': domains[idx]}
+                    if check_mx:
+                        result['mx'] = None
+                        result['mx_found'] = False
+                    if check_txt:
+                        result['txt'] = None
+                        result['txt_found'] = False
+                    if check_spf:
+                        result['spf'] = None
+                        result['spf_found'] = False
+                    if check_a:
+                        result['a'] = None
+                        result['a_found'] = False
+                    results[idx] = result
                     completed[0] += 1
                     yield f"data: {json.dumps({'type': 'progress', 'current': completed[0], 'total': total})}\n\n"
         

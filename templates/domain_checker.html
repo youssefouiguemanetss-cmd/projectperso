@@ -151,11 +151,8 @@
                 <button class="tab-btn flex-1 py-4 px-6 font-semibold text-center text-gray-600" data-tab="a">
                     <i class="fas fa-server mr-2"></i>A Records
                 </button>
-                <button class="tab-btn flex-1 py-4 px-6 font-semibold text-center text-gray-600" data-tab="mx">
-                    <i class="fas fa-envelope mr-2"></i>MX
-                </button>
-                <button class="tab-btn flex-1 py-4 px-6 font-semibold text-center text-gray-600" data-tab="txt">
-                    <i class="fas fa-file-alt mr-2"></i>TXT
+                <button class="tab-btn flex-1 py-4 px-6 font-semibold text-center text-gray-600" data-tab="lookup">
+                    <i class="fas fa-search mr-2"></i>Domain Lookup
                 </button>
             </div>
 
@@ -364,84 +361,84 @@
                     </div>
                 </div>
 
-                <div id="tab-mx" class="tab-content hidden">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="fas fa-list mr-1"></i> Domains (one per line)
-                        </label>
-                        <textarea id="mx-domains" class="input-modern w-full h-48 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="example.com&#10;domain.org&#10;website.net"></textarea>
-                    </div>
-                    <div class="mt-4">
-                        <button onclick="lookupMx()" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center">
-                            <i class="fas fa-search mr-2"></i>Lookup MX Records
-                        </button>
-                    </div>
-                    <div id="mx-results" class="mt-6 hidden">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="text-lg font-bold text-gray-800">Results</h3>
-                            <div class="flex items-center space-x-3">
-                                <label class="text-sm font-semibold text-gray-700">Filter:</label>
-                                <select id="mx-filter" onchange="filterMxResults()" class="input-modern px-3 py-2 rounded-lg text-sm">
-                                    <option value="all">All</option>
-                                    <option value="found">Found</option>
-                                    <option value="not_found">Not Found</option>
-                                </select>
-                                <button onclick="copyMxDomains()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
-                                    <i class="fas fa-copy mr-2"></i>Copy Domains
+                <div id="tab-lookup" class="tab-content hidden">
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="col-span-1">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-list mr-1"></i> Domains (one per line)
+                            </label>
+                            <textarea id="lookup-domains" class="input-modern w-full h-48 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="example.com&#10;domain.org&#10;website.net"></textarea>
+                            <div class="mt-4 p-4 bg-gray-50 rounded-xl">
+                                <label class="block text-sm font-semibold text-gray-700 mb-3">
+                                    <i class="fas fa-check-square mr-1"></i> Select Record Types
+                                </label>
+                                <div class="space-y-2">
+                                    <label class="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" id="check-mx" class="w-4 h-4 text-purple-600 rounded">
+                                        <span class="text-sm text-gray-700">MX Records</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" id="check-txt" class="w-4 h-4 text-purple-600 rounded">
+                                        <span class="text-sm text-gray-700">TXT Records</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" id="check-spf" class="w-4 h-4 text-purple-600 rounded">
+                                        <span class="text-sm text-gray-700">SPF Records</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox" id="check-a" class="w-4 h-4 text-purple-600 rounded">
+                                        <span class="text-sm text-gray-700">A Records (IP)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <button onclick="unifiedLookup()" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center w-full justify-center">
+                                    <i class="fas fa-search mr-2"></i>Lookup Records
                                 </button>
                             </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="bg-gray-50">
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Domain</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">MX Records</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mx-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="tab-txt" class="tab-content hidden">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="fas fa-list mr-1"></i> Domains (one per line)
-                        </label>
-                        <textarea id="txt-domains" class="input-modern w-full h-48 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="example.com&#10;domain.org&#10;website.net"></textarea>
-                    </div>
-                    <div class="mt-4">
-                        <button onclick="lookupTxt()" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center">
-                            <i class="fas fa-search mr-2"></i>Lookup TXT Records
-                        </button>
-                    </div>
-                    <div id="txt-results" class="mt-6 hidden">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="text-lg font-bold text-gray-800">Results</h3>
-                            <div class="flex items-center space-x-3">
-                                <label class="text-sm font-semibold text-gray-700">Filter:</label>
-                                <select id="txt-filter" onchange="filterTxtResults()" class="input-modern px-3 py-2 rounded-lg text-sm">
-                                    <option value="all">All</option>
-                                    <option value="found">Found</option>
-                                    <option value="not_found">Not Found</option>
-                                </select>
-                                <button onclick="copyTxtDomains()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
-                                    <i class="fas fa-copy mr-2"></i>Copy Domains
-                                </button>
+                        <div class="col-span-2">
+                            <div id="lookup-results" class="hidden">
+                                <div id="lookup-stats" class="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
+                                    <h3 class="text-sm font-bold text-gray-800 mb-2"><i class="fas fa-chart-bar mr-2"></i>Quick Stats</h3>
+                                    <div class="flex flex-wrap gap-4 text-sm" id="stats-content"></div>
+                                </div>
+                                <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="text" id="lookup-search" class="input-modern px-3 py-2 rounded-lg text-sm w-48" placeholder="Search domain..." oninput="filterLookupResults()">
+                                    </div>
+                                    <div class="flex items-center space-x-2 flex-wrap gap-2">
+                                        <div id="filter-toggles" class="flex items-center space-x-2 flex-wrap gap-1"></div>
+                                        <div class="flex items-center space-x-2">
+                                            <button onclick="toggleLookupColumns()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm flex items-center">
+                                                <i class="fas fa-columns mr-1"></i>Columns
+                                            </button>
+                                            <button onclick="exportLookupCsv()" class="btn-success text-white px-3 py-2 rounded-lg text-sm flex items-center">
+                                                <i class="fas fa-download mr-1"></i>Export CSV
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="column-toggle-panel" class="hidden mb-3 p-3 bg-gray-50 rounded-xl">
+                                    <div class="flex flex-wrap gap-3" id="column-toggles"></div>
+                                </div>
+                                <div class="border border-gray-200 rounded-xl overflow-hidden" style="height: 400px;">
+                                    <div class="overflow-auto h-full">
+                                        <table class="w-full" id="lookup-table">
+                                            <thead class="sticky top-0 bg-gray-50 z-10">
+                                                <tr id="lookup-header"></tr>
+                                            </thead>
+                                            <tbody id="lookup-table-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
-                                <thead>
-                                    <tr class="bg-gray-50">
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Domain</th>
-                                        <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">TXT Records</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="txt-table-body"></tbody>
-                            </table>
+                            <div id="lookup-placeholder" class="flex items-center justify-center h-64 text-gray-400">
+                                <div class="text-center">
+                                    <i class="fas fa-search text-4xl mb-3"></i>
+                                    <p>Enter domains and select record types to lookup</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1057,6 +1054,225 @@
                 return;
             }
             copyToClipboard(domains);
+        }
+
+        let lookupResults = [];
+        let lookupFilters = { mx: 'all', txt: 'all', spf: 'all', a: 'all' };
+        let lookupColumns = { mx: true, txt: true, spf: true, a: true };
+        let activeRecordTypes = [];
+
+        async function unifiedLookup() {
+            const domains = document.getElementById('lookup-domains').value.trim();
+            const checkMx = document.getElementById('check-mx').checked;
+            const checkTxt = document.getElementById('check-txt').checked;
+            const checkSpf = document.getElementById('check-spf').checked;
+            const checkA = document.getElementById('check-a').checked;
+
+            if (!domains) {
+                showError('Please enter at least one domain');
+                return;
+            }
+            if (!checkMx && !checkTxt && !checkSpf && !checkA) {
+                showError('Please select at least one record type');
+                return;
+            }
+
+            activeRecordTypes = [];
+            if (checkMx) activeRecordTypes.push('mx');
+            if (checkTxt) activeRecordTypes.push('txt');
+            if (checkSpf) activeRecordTypes.push('spf');
+            if (checkA) activeRecordTypes.push('a');
+            
+            lookupColumns = { mx: checkMx, txt: checkTxt, spf: checkSpf, a: checkA };
+            lookupFilters = { mx: 'all', txt: 'all', spf: 'all', a: 'all' };
+
+            showLoading('Looking up records...');
+            
+            try {
+                const encodedDomains = encodeURIComponent(domains);
+                const url = `/api/domain_checker/unified_lookup?domains=${encodedDomains}&check_mx=${checkMx}&check_txt=${checkTxt}&check_spf=${checkSpf}&check_a=${checkA}`;
+                const eventSource = new EventSource(url);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'progress') {
+                        updateLoadingProgress(data.current, data.total);
+                    } else if (data.type === 'complete') {
+                        eventSource.close();
+                        lookupResults = data.results;
+                        renderLookupUI();
+                        document.getElementById('lookup-results').classList.remove('hidden');
+                        document.getElementById('lookup-placeholder').classList.add('hidden');
+                        hideLoading();
+                        showToast(`Checked ${data.results.length} domains successfully!`, 'success');
+                    }
+                };
+                
+                eventSource.onerror = function(error) {
+                    eventSource.close();
+                    hideLoading();
+                    showError('Error connecting to server. Please try again.');
+                };
+            } catch (error) {
+                hideLoading();
+                showError('Error: ' + error.message);
+            }
+        }
+
+        function renderLookupUI() {
+            renderLookupStats();
+            renderFilterToggles();
+            renderColumnToggles();
+            renderLookupTable();
+        }
+
+        function renderLookupStats() {
+            const stats = document.getElementById('stats-content');
+            let html = `<span class="font-semibold">Total: ${lookupResults.length}</span>`;
+            activeRecordTypes.forEach(type => {
+                const found = lookupResults.filter(r => r[type + '_found']).length;
+                const notFound = lookupResults.length - found;
+                const label = type.toUpperCase();
+                html += `<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>${label} Found: ${found}</span>`;
+                html += `<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>${label} Not Found: ${notFound}</span>`;
+            });
+            stats.innerHTML = html;
+        }
+
+        function renderFilterToggles() {
+            const container = document.getElementById('filter-toggles');
+            let html = '';
+            activeRecordTypes.forEach(type => {
+                const label = type.toUpperCase();
+                html += `<select id="filter-${type}" onchange="updateLookupFilter('${type}', this.value)" class="input-modern px-2 py-1 rounded text-xs">
+                    <option value="all">${label}: All</option>
+                    <option value="found">${label}: Found</option>
+                    <option value="not_found">${label}: Not Found</option>
+                </select>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderColumnToggles() {
+            const container = document.getElementById('column-toggles');
+            let html = '';
+            activeRecordTypes.forEach(type => {
+                const label = type.toUpperCase();
+                const checked = lookupColumns[type] ? 'checked' : '';
+                html += `<label class="flex items-center space-x-1 cursor-pointer">
+                    <input type="checkbox" ${checked} onchange="toggleColumn('${type}', this.checked)" class="w-3 h-3">
+                    <span class="text-xs">${label}</span>
+                </label>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleLookupColumns() {
+            document.getElementById('column-toggle-panel').classList.toggle('hidden');
+        }
+
+        function toggleColumn(type, visible) {
+            lookupColumns[type] = visible;
+            renderLookupTable();
+        }
+
+        function updateLookupFilter(type, value) {
+            lookupFilters[type] = value;
+            filterLookupResults();
+        }
+
+        function filterLookupResults() {
+            renderLookupTable();
+        }
+
+        function getFilteredResults() {
+            const searchTerm = document.getElementById('lookup-search').value.toLowerCase();
+            return lookupResults.filter(r => {
+                if (searchTerm && !r.domain.toLowerCase().includes(searchTerm)) return false;
+                for (const type of activeRecordTypes) {
+                    const filter = lookupFilters[type];
+                    if (filter === 'found' && !r[type + '_found']) return false;
+                    if (filter === 'not_found' && r[type + '_found']) return false;
+                }
+                return true;
+            });
+        }
+
+        function renderLookupTable() {
+            const filtered = getFilteredResults();
+            const header = document.getElementById('lookup-header');
+            const tbody = document.getElementById('lookup-table-body');
+            
+            let headerHtml = '<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700 sticky left-0 bg-gray-50">Domain</th>';
+            activeRecordTypes.forEach(type => {
+                if (lookupColumns[type]) {
+                    headerHtml += `<th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">${type.toUpperCase()}</th>`;
+                }
+            });
+            header.innerHTML = headerHtml;
+            
+            tbody.innerHTML = '';
+            filtered.forEach(r => {
+                const row = document.createElement('tr');
+                row.className = 'result-row border-b border-gray-100';
+                let rowHtml = `<td class="px-4 py-3 font-mono text-sm sticky left-0 bg-white">${r.domain}</td>`;
+                activeRecordTypes.forEach(type => {
+                    if (lookupColumns[type]) {
+                        const found = r[type + '_found'];
+                        const badge = found ? 
+                            '<span class="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Found</span>' :
+                            '<span class="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Not Found</span>';
+                        let content = badge;
+                        if (found && r[type]) {
+                            if (Array.isArray(r[type])) {
+                                content += `<div class="mt-1 text-xs text-gray-600">${r[type].slice(0,3).join(', ')}${r[type].length > 3 ? '...' : ''}</div>`;
+                            } else {
+                                content += `<div class="mt-1 text-xs text-gray-600 truncate max-w-xs" title="${r[type]}">${r[type].substring(0, 50)}${r[type].length > 50 ? '...' : ''}</div>`;
+                            }
+                        }
+                        rowHtml += `<td class="px-4 py-3 text-sm">${content}</td>`;
+                    }
+                });
+                row.innerHTML = rowHtml;
+                tbody.appendChild(row);
+            });
+        }
+
+        function exportLookupCsv() {
+            const filtered = getFilteredResults();
+            if (filtered.length === 0) {
+                showToast('No data to export', 'warning');
+                return;
+            }
+            let headers = ['Domain'];
+            activeRecordTypes.forEach(type => {
+                if (lookupColumns[type]) headers.push(type.toUpperCase());
+            });
+            let csv = headers.join(',') + '\n';
+            filtered.forEach(r => {
+                let row = [`"${r.domain}"`];
+                activeRecordTypes.forEach(type => {
+                    if (lookupColumns[type]) {
+                        const val = r[type];
+                        if (val === null) {
+                            row.push('"Not Found"');
+                        } else if (Array.isArray(val)) {
+                            row.push(`"${val.join('; ')}"`);
+                        } else {
+                            row.push(`"${val.replace(/"/g, '""')}"`);
+                        }
+                    }
+                });
+                csv += row.join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'domain_lookup_results.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV exported successfully!', 'success');
         }
     </script>
 </body>

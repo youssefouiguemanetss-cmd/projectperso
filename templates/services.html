@@ -283,6 +283,53 @@
                 </div>
             </div>
             {% endif %}
+
+            {% if current_user.has_tssw_report_permission %}
+            <!-- TSSW Rapport Service -->
+            <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
+                 onclick="window.location.href='{{ url_for('tssw_rapport') }}'">
+                <div class="text-center">
+                    <!-- Service Icon -->
+                    <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);">
+                        <i class="fas fa-file-alt text-white text-2xl"></i>
+                    </div>
+                    
+                    <!-- Service Title -->
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">TSSW Rapport</h3>
+                    
+                    <!-- Service Description -->
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Access the TSSW Rapport service for specialized reporting and analytics tools.
+                    </p>
+                    
+                    <!-- Features List -->
+                    <div class="text-left space-y-2 mb-6">
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Specialized reports
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Analytics dashboard
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Data visualization
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Export capabilities
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="text-white px-6 py-3 rounded-lg transition-colors duration-200 font-semibold" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);">
+                        <i class="fas fa-arrow-right mr-2"></i>
+                        Open Rapport
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Additional Info -->
