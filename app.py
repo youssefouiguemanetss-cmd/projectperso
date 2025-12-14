@@ -36,7 +36,7 @@ login_manager.login_message_category = 'info'
 
 # User class for Flask-Login
 class User(UserMixin):
-    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False, has_tssw_report_permission=False):
+    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False, has_tssw_report_permission=False, has_gmass_permission=False):
         self.id = username
         self.username = username
         self.entity = entity
@@ -47,6 +47,7 @@ class User(UserMixin):
         self.has_find_news_permission = has_find_news_permission
         self.has_extract_emails_permission = has_extract_emails_permission
         self.has_tssw_report_permission = has_tssw_report_permission
+        self.has_gmass_permission = has_gmass_permission
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -62,8 +63,9 @@ def load_user(user_id):
         has_find_news = user_data['has_find_news_permission']
         has_extract_emails = user_data['has_extract_emails_permission']
         has_tssw_report = user_data['has_tssw_report_permission']
+        has_gmass = user_data['has_gmass_permission']
         if username == user_id:
-            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report)
+            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report, has_gmass)
     return None
 
 def load_users_from_file():
@@ -88,6 +90,7 @@ def load_users_from_file():
                             has_find_news = 'find_news' in permissions
                             has_extract_emails = 'Extract_emails' in permissions
                             has_tssw_report = 'tssw_report' in permissions
+                            has_gmass = 'gmass' in permissions
                             users.append({
                                 'entity': entity,
                                 'name': name,
@@ -99,7 +102,8 @@ def load_users_from_file():
                                 'has_domain_checker_permission': has_domain_checker,
                                 'has_find_news_permission': has_find_news,
                                 'has_extract_emails_permission': has_extract_emails,
-                                'has_tssw_report_permission': has_tssw_report
+                                'has_tssw_report_permission': has_tssw_report,
+                                'has_gmass_permission': has_gmass
                             })
                         else:
                             logging.warning(f"Invalid format in users.txt line {line_num}: {line}")

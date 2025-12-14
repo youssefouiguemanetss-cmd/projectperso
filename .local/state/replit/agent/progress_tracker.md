@@ -60,4 +60,9 @@
 [x] 60. Final import migration to Replit environment completed - Dec 13, 2025
 [x] 61. All packages reinstalled and workflow reconfigured with webview output type
 [x] 62. Application verified running successfully with screenshot confirmation
+[x] 63. Added Export CSV button for DMARC filtered domains - exports based on current filter (All/Found/Not Found)
+[x] 64. CSV export includes Domain and DMARC Record columns
+[x] 65. Added gmass permission check - TSS Gmail Access service now only visible to users with "gmass" in their permissions
+[x] 66. Updated User class to support has_gmass_permission property
+[x] 67. All changes verified and application running successfully - Dec 14, 2025
 [x] 63. Final environment migration - Dec 14, 2025 - packages reinstalled, workflow configured, application running successfully

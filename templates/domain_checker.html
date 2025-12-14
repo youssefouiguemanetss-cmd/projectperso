@@ -203,6 +203,9 @@
                                         <button onclick="copyDmarcFilteredDomains()" class="btn-success text-white px-4 py-2 rounded-lg text-sm flex items-center">
                                             <i class="fas fa-copy mr-2"></i>Copy Domains
                                         </button>
+                                        <button onclick="exportDmarcCsv()" class="btn-primary text-white px-4 py-2 rounded-lg text-sm flex items-center">
+                                            <i class="fas fa-file-csv mr-2"></i>Export CSV
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="overflow-x-auto max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
@@ -683,6 +686,36 @@
                 return;
             }
             copyToClipboard(domains);
+        }
+        
+        function exportDmarcCsv() {
+            const filter = document.getElementById('dmarc-filter').value;
+            let filtered = dmarcResults;
+            if (filter === 'found') {
+                filtered = dmarcResults.filter(r => r.dmarc !== 'Not Found');
+            } else if (filter === 'not_found') {
+                filtered = dmarcResults.filter(r => r.dmarc === 'Not Found');
+            }
+            
+            if (filtered.length === 0) {
+                showToast('No data to export', 'warning');
+                return;
+            }
+            
+            let csv = 'Domain,DMARC Record\n';
+            filtered.forEach(r => {
+                const dmarcValue = r.dmarc.replace(/"/g, '""');
+                csv += `"${r.domain}","${dmarcValue}"\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'dmarc_results.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV exported successfully!', 'success');
         }
         
         function toggleSinglePrefix() {
