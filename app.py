@@ -36,7 +36,7 @@ login_manager.login_message_category = 'info'
 
 # User class for Flask-Login
 class User(UserMixin):
-    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False, has_tssw_report_permission=False, has_gmass_permission=False):
+    def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False, has_tssw_report_permission=False, has_gmass_permission=False, has_blacklist_lookup_permission=False):
         self.id = username
         self.username = username
         self.entity = entity
@@ -48,6 +48,7 @@ class User(UserMixin):
         self.has_extract_emails_permission = has_extract_emails_permission
         self.has_tssw_report_permission = has_tssw_report_permission
         self.has_gmass_permission = has_gmass_permission
+        self.has_blacklist_lookup_permission = has_blacklist_lookup_permission
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -64,8 +65,9 @@ def load_user(user_id):
         has_extract_emails = user_data['has_extract_emails_permission']
         has_tssw_report = user_data['has_tssw_report_permission']
         has_gmass = user_data['has_gmass_permission']
+        has_blacklist_lookup = user_data['has_blacklist_lookup_permission']
         if username == user_id:
-            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report, has_gmass)
+            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report, has_gmass, has_blacklist_lookup)
     return None
 
 def load_users_from_file():
@@ -91,6 +93,7 @@ def load_users_from_file():
                             has_extract_emails = 'Extract_emails' in permissions
                             has_tssw_report = 'tssw_report' in permissions
                             has_gmass = 'gmass' in permissions
+                            has_blacklist_lookup = 'blacklist_lookup' in permissions
                             users.append({
                                 'entity': entity,
                                 'name': name,
@@ -103,7 +106,8 @@ def load_users_from_file():
                                 'has_find_news_permission': has_find_news,
                                 'has_extract_emails_permission': has_extract_emails,
                                 'has_tssw_report_permission': has_tssw_report,
-                                'has_gmass_permission': has_gmass
+                                'has_gmass_permission': has_gmass,
+                                'has_blacklist_lookup_permission': has_blacklist_lookup
                             })
                         else:
                             logging.warning(f"Invalid format in users.txt line {line_num}: {line}")
@@ -2344,6 +2348,133 @@ def api_unified_lookup():
             'Connection': 'keep-alive'
         }
     )
+
+@app.route('/blacklist_lookup')
+@login_required
+def blacklist_lookup():
+    """Blacklist Lookup Service"""
+    if not current_user.has_blacklist_lookup_permission:
+        return redirect(url_for('services'))
+    return render_template('blacklist_lookup.html')
+
+# Spamhaus DQS Key
+DQS_KEY = "f3jqdoqpeyipweiizk7onufnlm"
+
+def check_spamhaus_ip(ip):
+    """Check IP against Spamhaus blocklists (CSS, PBL, XBL, SBL)"""
+    try:
+        rev = ".".join(ip.split(".")[::-1])
+        query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
+        answers = resolver.resolve(query, "A")
+        found = {r.to_text() for r in answers}
+
+        if "127.0.0.3" in found:
+            return "css"
+        if "127.0.0.2" in found or "127.0.0.9" in found:
+            return "sbl"
+        if found.intersection({"127.0.0.4", "127.0.0.5", "127.0.0.6", "127.0.0.7"}):
+            return "xbl"
+        if "127.0.0.10" in found or "127.0.0.11" in found:
+            return "pbl"
+        return None
+    except dns.resolver.NXDOMAIN:
+        return None
+    except Exception as e:
+        logging.debug(f"Error checking IP {ip}: {e}")
+        return None
+
+def check_barracuda(ip):
+    """Check IP against Barracuda blocklist"""
+    try:
+        rev = ".".join(ip.split(".")[::-1])
+        query = f"{rev}.b.barracudacentral.org"
+        resolver.resolve(query, "A")
+        return True
+    except dns.resolver.NXDOMAIN:
+        return False
+    except Exception:
+        return False
+
+def check_spamhaus_domain(domain):
+    """Check domain against Spamhaus DBL"""
+    try:
+        query = f"{domain}.{DQS_KEY}.dbl.dq.spamhaus.net"
+        answers = resolver.resolve(query, "A")
+        if any(r.to_text().startswith("127.0.1.") for r in answers):
+            return "dbl"
+        return None
+    except dns.resolver.NXDOMAIN:
+        return None
+    except Exception as e:
+        logging.debug(f"Error checking domain {domain}: {e}")
+        return None
+
+@app.route('/api/check_blacklists', methods=['POST'])
+@login_required
+def check_blacklists_api():
+    """API endpoint to check IPs and domains against blacklists"""
+    if not current_user.has_blacklist_lookup_permission:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    try:
+        data = request.get_json()
+        lines = data.get('lines', [])
+        
+        if not lines:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        results = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line or ':' not in line:
+                continue
+            
+            parts = line.split(':')
+            if len(parts) < 4:
+                continue
+            
+            serveur = parts[0].strip()
+            ip = parts[1].strip()
+            domain = parts[2].strip()
+            status = parts[3].strip()
+            
+            # Validate IP format
+            try:
+                octets = ip.split('.')
+                if len(octets) != 4 or not all(0 <= int(o) <= 255 for o in octets):
+                    continue
+            except:
+                continue
+            
+            # Check IP blocklists
+            spamhaus_ip = check_spamhaus_ip(ip)
+            barracuda_result = check_barracuda(ip)
+            
+            # Check domain blocklists
+            dbl_result = check_spamhaus_domain(domain)
+            
+            # Build result row
+            result_row = {
+                'serveur': serveur,
+                'ip': ip,
+                'domain': domain,
+                'status': status,
+                'css': 'Listed' if spamhaus_ip == 'css' else 'not Listed',
+                'pbl': 'Listed' if spamhaus_ip == 'pbl' else 'not Listed',
+                'xbl': 'Listed' if spamhaus_ip == 'xbl' else 'not Listed',
+                'sbl': 'Listed' if spamhaus_ip == 'sbl' else 'not Listed',
+                'barracuda': 'Listed' if barracuda_result else 'not Listed',
+                'dbl': 'Listed' if dbl_result == 'dbl' else 'not Listed'
+            }
+            
+            results.append(result_row)
+        
+        return jsonify({'results': results})
+    
+    except Exception as e:
+        logging.error(f"Error in check_blacklists_api: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

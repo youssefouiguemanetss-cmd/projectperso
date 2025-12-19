@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSS - Blacklist Lookup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            transition: all 0.3s ease;
+        }
+        .input-modern {
+            transition: all 0.2s ease;
+            border: 2px solid #e5e7eb;
+        }
+        .input-modern:focus {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+        }
+        .badge-listed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .badge-clean {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            items-align: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .result-row:hover {
+            background: #f9fafb;
+        }
+        .stats-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="glass-card shadow-lg border-b border-gray-100">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('services') }}" class="text-gray-600 hover:text-gray-800 transition-colors flex items-center">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Services
+                    </a>
+                    <div class="h-6 w-px bg-gray-300"></div>
+                    <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center mr-3 shadow-lg">
+                            <i class="fas fa-shield-virus text-white"></i>
+                        </div>
+                        Blacklist Lookup
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="bg-gradient-to-br from-purple-500 to-indigo-600 text-white px-4 py-2 rounded-xl shadow-lg">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-user-circle text-lg"></i>
+                            <div class="text-sm">
+                                <div class="font-semibold">{{ current_user.name }}</div>
+                                <div class="text-xs opacity-90">{{ current_user.entity }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="btn-danger text-white px-4 py-2 rounded-xl flex items-center space-x-2 shadow-lg">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <div class="glass-card rounded-2xl shadow-xl overflow-hidden">
+            <div class="p-8">
+                <div class="mb-8">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-list mr-1"></i> Enter Data (Format: SERVEUR:IP:DOMAIN:STATUS, one per line)
+                    </label>
+                    <textarea id="blacklist-input" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="SERVEUR1:192.168.1.1:example.com:ACTIVE&#10;SERVEUR2:10.0.0.1:domain.org:INACTIVE"></textarea>
+                    <div class="mt-2 text-sm text-gray-500">
+                        Or <label class="text-purple-600 cursor-pointer hover:underline">
+                            <input type="file" id="blacklist-file" accept=".txt" class="hidden">upload a .txt file
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 mb-8">
+                    <button id="check-btn" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-search"></i>
+                        <span>Check Blacklists</span>
+                    </button>
+                </div>
+
+                <!-- Statistics Section -->
+                <div id="stats-section" class="hidden mb-8 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">Blacklist Summary</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div class="text-center">
+                            <div class="stats-badge">CSS: <span id="stat-css">0</span></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="stats-badge">PBL: <span id="stat-pbl">0</span></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="stats-badge">XBL: <span id="stat-xbl">0</span></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="stats-badge">DBL: <span id="stat-dbl">0</span></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="stats-badge">Barracuda: <span id="stat-barracuda">0</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Section -->
+                <div id="filter-section" class="hidden mb-8 p-4 bg-gray-100 rounded-xl">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                        <i class="fas fa-filter mr-1"></i> Filter Results by Status
+                    </label>
+                    <div class="flex gap-2 flex-wrap">
+                        <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border-2 border-purple-600 text-purple-600 active" data-filter="all">All</button>
+                        <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border-2 border-gray-300 text-gray-600" data-filter="listed">Listed</button>
+                        <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border-2 border-gray-300 text-gray-600" data-filter="clean">Clean</button>
+                    </div>
+                </div>
+
+                <!-- Results Table -->
+                <div id="results-section" class="hidden overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 border-b border-gray-300">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-800">Serveur <i class="fas fa-copy cursor-pointer text-gray-500 hover:text-gray-800 ml-2"></i></th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-800">IP <i class="fas fa-copy cursor-pointer text-gray-500 hover:text-gray-800 ml-2"></i></th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-800">Domain <i class="fas fa-copy cursor-pointer text-gray-500 hover:text-gray-800 ml-2"></i></th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-800">Status</th>
+                                <th class="px-4 py-3 text-center font-semibold text-gray-800">CSS</th>
+                                <th class="px-4 py-3 text-center font-semibold text-gray-800">PBL</th>
+                                <th class="px-4 py-3 text-center font-semibold text-gray-800">XBL</th>
+                                <th class="px-4 py-3 text-center font-semibold text-gray-800">SBL</th>
+                                <th class="px-4 py-3 text-center font-semibold text-gray-800">Barracuda</th>
+                                <th class="px-4 py-3 text-center font-semibold text-gray-800">DBL</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Export Buttons -->
+                <div id="export-section" class="hidden mt-8 flex gap-4">
+                    <button id="export-csv-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-download"></i>
+                        <span>Export CSV (Filtered)</span>
+                    </button>
+                    <button id="copy-clean-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-copy"></i>
+                        <span>Copy Clean IPs</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="text-center">
+            <div class="loading-spinner text-white text-5xl mb-4">
+                <i class="fas fa-spinner"></i>
+            </div>
+            <p id="progress-text" class="text-white text-lg font-semibold">Processing...</p>
+        </div>
+    </div>
+
+    <script>
+        const DQS_KEY = "f3jqdoqpeyipweiizk7onufnlm";
+        let allResults = [];
+        let currentFilter = 'all';
+
+        document.getElementById('blacklist-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    document.getElementById('blacklist-input').value = event.target.result;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('check-btn').addEventListener('click', checkBlacklists);
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active', 'border-purple-600', 'text-purple-600'));
+                this.classList.add('active', 'border-purple-600', 'text-purple-600');
+                currentFilter = this.dataset.filter;
+                displayResults(allResults);
+            });
+        });
+
+        document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
+        document.getElementById('copy-clean-btn').addEventListener('click', copyCleanIPs);
+
+        async function checkBlacklists() {
+            const input = document.getElementById('blacklist-input').value.trim();
+            if (!input) {
+                alert('Please enter data in the required format');
+                return;
+            }
+
+            const lines = input.split('\n').filter(l => l.trim());
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/check_blacklists', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lines: lines })
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    allResults = data.results || [];
+                    displayResults(allResults);
+                    updateStatistics(allResults);
+                    document.getElementById('filter-section').classList.remove('hidden');
+                    document.getElementById('export-section').classList.remove('hidden');
+                }
+            } catch (error) {
+                alert('Error checking blacklists: ' + error.message);
+            } finally {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function displayResults(results) {
+            const tbody = document.getElementById('results-body');
+            tbody.innerHTML = '';
+
+            const filtered = results.filter(r => {
+                if (currentFilter === 'all') return true;
+                const isListed = r.css === 'Listed' || r.pbl === 'Listed' || r.xbl === 'Listed' || r.sbl === 'Listed' || r.barracuda === 'Listed' || r.dbl === 'Listed';
+                return currentFilter === 'listed' ? isListed : !isListed;
+            });
+
+            filtered.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'result-row border-b border-gray-200 hover:bg-gray-50';
+                
+                const isListed = row.css === 'Listed' || row.pbl === 'Listed' || row.xbl === 'Listed' || row.sbl === 'Listed' || row.barracuda === 'Listed' || row.dbl === 'Listed';
+                
+                tr.innerHTML = `
+                    <td class="px-4 py-3">${row.serveur} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-gray-700" onclick="copyToClipboard('${row.serveur}')"></i></td>
+                    <td class="px-4 py-3">${row.ip} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-gray-700" onclick="copyToClipboard('${row.ip}')"></i></td>
+                    <td class="px-4 py-3">${row.domain} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-gray-700" onclick="copyToClipboard('${row.domain}')"></i></td>
+                    <td class="px-4 py-3 font-semibold">${row.status}</td>
+                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.css === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.css}</span></td>
+                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.pbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.pbl}</span></td>
+                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.xbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.xbl}</span></td>
+                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.sbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.sbl}</span></td>
+                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.barracuda === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.barracuda}</span></td>
+                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.dbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.dbl}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('results-section').classList.remove('hidden');
+        }
+
+        function updateStatistics(results) {
+            const stats = { css: 0, pbl: 0, xbl: 0, dbl: 0, barracuda: 0 };
+            results.forEach(r => {
+                if (r.css === 'Listed') stats.css++;
+                if (r.pbl === 'Listed') stats.pbl++;
+                if (r.xbl === 'Listed') stats.xbl++;
+                if (r.dbl === 'Listed') stats.dbl++;
+                if (r.barracuda === 'Listed') stats.barracuda++;
+            });
+            document.getElementById('stat-css').textContent = stats.css;
+            document.getElementById('stat-pbl').textContent = stats.pbl;
+            document.getElementById('stat-xbl').textContent = stats.xbl;
+            document.getElementById('stat-dbl').textContent = stats.dbl;
+            document.getElementById('stat-barracuda').textContent = stats.barracuda;
+            document.getElementById('stats-section').classList.remove('hidden');
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied: ' + text);
+            });
+        }
+
+        function copyCleanIPs() {
+            const cleanIPs = allResults
+                .filter(r => r.css === 'not Listed' && r.pbl === 'not Listed' && r.xbl === 'not Listed' && 
+                           r.sbl === 'not Listed' && r.barracuda === 'not Listed' && r.dbl === 'not Listed')
+                .map(r => r.ip)
+                .join('\n');
+            
+            if (!cleanIPs) {
+                alert('No clean IPs found');
+                return;
+            }
+            
+            navigator.clipboard.writeText(cleanIPs).then(() => {
+                alert('Clean IPs copied to clipboard!');
+            });
+        }
+
+        function exportCSV() {
+            const filtered = allResults.filter(r => {
+                if (currentFilter === 'all') return true;
+                const isListed = r.css === 'Listed' || r.pbl === 'Listed' || r.xbl === 'Listed' || r.sbl === 'Listed' || r.barracuda === 'Listed' || r.dbl === 'Listed';
+                return currentFilter === 'listed' ? isListed : !isListed;
+            });
+
+            let csv = 'Serveur,IP,Domain,Status,CSS,PBL,XBL,SBL,Barracuda,DBL\n';
+            filtered.forEach(r => {
+                csv += `"${r.serveur}","${r.ip}","${r.domain}","${r.status}","${r.css}","${r.pbl}","${r.xbl}","${r.sbl}","${r.barracuda}","${r.dbl}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'blacklist_results_' + new Date().toISOString().split('T')[0] + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>

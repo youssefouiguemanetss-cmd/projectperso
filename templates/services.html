@@ -286,6 +286,54 @@
             </div>
             {% endif %}
 
+            {% if current_user.has_blacklist_lookup_permission %}
+            <!-- Blacklist Lookup Service -->
+            <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
+                 onclick="window.location.href='{{ url_for('blacklist_lookup') }}'">
+                <div class="text-center">
+                    <!-- Service Icon -->
+                    <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                        <i class="fas fa-shield-virus text-white text-2xl"></i>
+                    </div>
+                    
+                    <!-- Service Title -->
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Blacklist Lookup</h3>
+                    
+                    <!-- Service Description -->
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Check IP addresses and domains against Spamhaus and Barracuda blacklists. 
+                        Identify malicious IPs and domains with detailed blocklist status.
+                    </p>
+                    
+                    <!-- Features List -->
+                    <div class="text-left space-y-2 mb-6">
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Spamhaus CSS, PBL, XBL checks
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Spamhaus DBL domain lookup
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Barracuda blocklist verification
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            CSV export & bulk processing
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="text-white px-6 py-3 rounded-lg transition-colors duration-200 font-semibold" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                        <i class="fas fa-arrow-right mr-2"></i>
+                        Check Blacklists
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             {% if current_user.has_tssw_report_permission %}
             <!-- TSSW Rapport Service -->
             <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
