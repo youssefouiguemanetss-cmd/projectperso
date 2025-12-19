@@ -577,7 +577,7 @@
                 const getBadge = (value) => {
                     return value === 'Listed' 
                         ? '<span class="inline-block px-2 py-1 rounded-md text-xs font-bold badge-listed">Listed</span>'
-                        : '<span class="inline-block px-2 py-1 rounded-md text-xs font-bold badge-clean">Clean</span>';
+                        : '<span class="inline-block px-2 py-1 rounded-md text-xs font-bold badge-clean">' + value + '</span>';
                 };
                 
                 tr.innerHTML = `
@@ -685,8 +685,8 @@
 
         function copyCleanIPs() {
             const cleanIPs = allResults
-                .filter(r => r.css === 'not Listed' && r.pbl === 'not Listed' && r.xbl === 'not Listed' && 
-                           r.sbl === 'not Listed' && r.barracuda === 'not Listed' && r.dbl === 'not Listed')
+                .filter(r => r.css === 'Clean' && r.pbl === 'Clean' && r.xbl === 'Clean' && 
+                           r.sbl === 'Clean' && r.barracuda === 'Clean' && r.dbl === 'Clean')
                 .map(r => r.ip)
                 .join('\n');
             

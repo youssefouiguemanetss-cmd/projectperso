@@ -2367,27 +2367,30 @@ def blacklist_lookup():
 DQS_KEY = os.environ.get("DQS_KEY", "")
 
 def check_spamhaus_ip(ip):
-    """Check IP against Spamhaus blocklists (CSS, PBL, XBL, SBL)"""
+    """Check IP against Spamhaus blocklists (CSS, PBL, XBL, SBL) - returns dict with all results"""
+    result = {'css': False, 'sbl': False, 'xbl': False, 'pbl': False}
     try:
         rev = ".".join(ip.split(".")[::-1])
         query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
         answers = resolver.resolve(query, "A")
         found = {r.to_text() for r in answers}
-
+        
+        # Check each blacklist independently - IP can be on multiple lists
         if "127.0.0.3" in found:
-            return "css"
+            result['css'] = True
         if "127.0.0.2" in found or "127.0.0.9" in found:
-            return "sbl"
+            result['sbl'] = True
         if found.intersection({"127.0.0.4", "127.0.0.5", "127.0.0.6", "127.0.0.7"}):
-            return "xbl"
+            result['xbl'] = True
         if "127.0.0.10" in found or "127.0.0.11" in found:
-            return "pbl"
-        return None
+            result['pbl'] = True
+        
+        return result
     except dns.resolver.NXDOMAIN:
-        return None
+        return result
     except Exception as e:
         logging.debug(f"Error checking IP {ip}: {e}")
-        return None
+        return result
 
 def check_barracuda(ip):
     """Check IP against Barracuda blocklist"""
@@ -2419,8 +2422,8 @@ def check_single_entry(entry_data):
     """Check a single IP/domain entry against all blacklists - for parallel processing"""
     idx, serveur, ip, domain, status = entry_data
     
-    # Check IP blocklists
-    spamhaus_ip = check_spamhaus_ip(ip)
+    # Check IP blocklists - returns dict with css, sbl, xbl, pbl as booleans
+    spamhaus_results = check_spamhaus_ip(ip)
     barracuda_result = check_barracuda(ip)
     
     # Check domain blocklists
@@ -2432,12 +2435,12 @@ def check_single_entry(entry_data):
         'ip': ip,
         'domain': domain,
         'status': status,
-        'css': 'Listed' if spamhaus_ip == 'css' else 'not Listed',
-        'pbl': 'Listed' if spamhaus_ip == 'pbl' else 'not Listed',
-        'xbl': 'Listed' if spamhaus_ip == 'xbl' else 'not Listed',
-        'sbl': 'Listed' if spamhaus_ip == 'sbl' else 'not Listed',
-        'barracuda': 'Listed' if barracuda_result else 'not Listed',
-        'dbl': 'Listed' if dbl_result == 'dbl' else 'not Listed'
+        'css': 'Listed' if spamhaus_results['css'] else 'Clean',
+        'pbl': 'Listed' if spamhaus_results['pbl'] else 'Clean',
+        'xbl': 'Listed' if spamhaus_results['xbl'] else 'Clean',
+        'sbl': 'Listed' if spamhaus_results['sbl'] else 'Clean',
+        'barracuda': 'Listed' if barracuda_result else 'Clean',
+        'dbl': 'Listed' if dbl_result == 'dbl' else 'Clean'
     }
 
 @app.route('/api/check_blacklists_stream', methods=['POST'])
