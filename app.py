@@ -38,7 +38,15 @@ login_manager.login_message_category = 'info'
 resolver = dns.resolver.Resolver()
 resolver.timeout = 5
 resolver.lifetime = 10
+resolver.retries = 3
 resolver.nameservers = ['8.8.8.8', '1.1.1.1']
+
+# Dedicated resolver for blacklist lookups (with retries for reliability)
+blacklist_resolver = dns.resolver.Resolver()
+blacklist_resolver.timeout = 5
+blacklist_resolver.lifetime = 10
+blacklist_resolver.retries = 3
+blacklist_resolver.nameservers = ['8.8.8.8', '1.1.1.1']
 
 # User class for Flask-Login
 class User(UserMixin):
@@ -2367,12 +2375,14 @@ def blacklist_lookup():
 DQS_KEY = os.environ.get("DQS_KEY", "")
 
 def check_spamhaus_ip(ip):
-    """Check IP against Spamhaus blocklists (CSS, PBL, XBL, SBL) - returns dict with all results"""
-    result = {'css': False, 'sbl': False, 'xbl': False, 'pbl': False}
+    """Check IP against Spamhaus blocklists (CSS, PBL, XBL, SBL) - returns dict with all results
+    Uses DQS key for reliable results. Returns status for each blacklist.
+    """
+    result = {'css': False, 'sbl': False, 'xbl': False, 'pbl': False, 'error': False}
     try:
         rev = ".".join(ip.split(".")[::-1])
         query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
-        answers = resolver.resolve(query, "A")
+        answers = blacklist_resolver.resolve(query, "A")
         found = {r.to_text() for r in answers}
         
         # Check each blacklist independently - IP can be on multiple lists
@@ -2384,12 +2394,17 @@ def check_spamhaus_ip(ip):
             result['xbl'] = True
         if "127.0.0.10" in found or "127.0.0.11" in found:
             result['pbl'] = True
+        # Catch any other 127.0.0.x response as SBL (fallback)
+        if any(r.startswith("127.0.0.") for r in found) and not any([result['css'], result['sbl'], result['xbl'], result['pbl']]):
+            result['sbl'] = True
         
         return result
     except dns.resolver.NXDOMAIN:
+        # NXDOMAIN means not listed - this is clean
         return result
     except Exception as e:
         logging.debug(f"Error checking IP {ip}: {e}")
+        result['error'] = True
         return result
 
 def check_barracuda(ip):
@@ -2397,7 +2412,7 @@ def check_barracuda(ip):
     try:
         rev = ".".join(ip.split(".")[::-1])
         query = f"{rev}.b.barracudacentral.org"
-        resolver.resolve(query, "A")
+        blacklist_resolver.resolve(query, "A")
         return True
     except dns.resolver.NXDOMAIN:
         return False
@@ -2405,18 +2420,20 @@ def check_barracuda(ip):
         return False
 
 def check_spamhaus_domain(domain):
-    """Check domain against Spamhaus DBL"""
+    """Check domain against Spamhaus DBL using DQS key"""
     try:
         query = f"{domain}.{DQS_KEY}.dbl.dq.spamhaus.net"
-        answers = resolver.resolve(query, "A")
+        answers = blacklist_resolver.resolve(query, "A")
+        # Any 127.0.1.x response means listed in DBL
         if any(r.to_text().startswith("127.0.1.") for r in answers):
             return "dbl"
-        return None
+        return "clean"
     except dns.resolver.NXDOMAIN:
-        return None
+        # NXDOMAIN means domain is not listed - clean
+        return "clean"
     except Exception as e:
         logging.debug(f"Error checking domain {domain}: {e}")
-        return None
+        return "error"
 
 def check_single_entry(entry_data):
     """Check a single IP/domain entry against all blacklists - for parallel processing"""
@@ -2514,8 +2531,8 @@ def check_blacklists_stream():
             results = []
             completed = 0
             
-            # Use ThreadPoolExecutor for parallel processing (up to 30 concurrent)
-            with ThreadPoolExecutor(max_workers=30) as executor:
+            # Use ThreadPoolExecutor for parallel processing (20 concurrent to avoid DNS rate limiting)
+            with ThreadPoolExecutor(max_workers=20) as executor:
                 futures = {executor.submit(check_single_entry, entry): entry for entry in valid_entries}
                 
                 for future in as_completed(futures):
