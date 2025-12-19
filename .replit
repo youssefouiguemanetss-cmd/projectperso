@@ -39,3 +39,8 @@ externalPort = 80
 
 [agent]
 expertMode = true
+
+[userenv]
+
+[userenv.shared]
+DQS_KEY = "f3jqdoqpeyipweiizk7onufnlm"

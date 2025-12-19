@@ -17,6 +17,11 @@
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        .glass-dark {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             transition: all 0.3s ease;
@@ -37,13 +42,27 @@
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             transition: all 0.3s ease;
         }
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(107, 114, 128, 0.4);
+        }
         .input-modern {
             transition: all 0.2s ease;
             border: 2px solid #e5e7eb;
+            background: rgba(255, 255, 255, 0.9);
         }
         .input-modern:focus {
             border-color: #8b5cf6;
             box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+            outline: none;
         }
         .loading-overlay {
             position: fixed;
@@ -52,6 +71,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -64,33 +84,80 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
         .result-row:hover {
-            background: #f9fafb;
+            background: linear-gradient(90deg, rgba(139, 92, 246, 0.05) 0%, rgba(102, 126, 234, 0.05) 100%);
         }
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            transition: all 0.3s ease;
         }
-        .badge-red { background: #fee2e2; color: #991b1b; }
-        .badge-green { background: #dcfce7; color: #166534; }
-        .error-box { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-        .warning-box { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.2);
+        }
+        .badge-listed { 
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white; 
+        }
+        .badge-clean { 
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white; 
+        }
         .select-filter {
-            padding: 0.375rem 0.75rem;
+            padding: 0.5rem 0.75rem;
             border: 2px solid #e5e7eb;
             border-radius: 0.5rem;
             font-size: 0.875rem;
             transition: all 0.2s;
+            background: white;
         }
         .select-filter:focus {
             outline: none;
             border-color: #8b5cf6;
             box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
         }
+        .pagination-btn {
+            transition: all 0.2s ease;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-1px);
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .progress-ring {
+            animation: pulse 2s infinite;
+        }
+        .table-container {
+            scrollbar-width: thin;
+            scrollbar-color: #8b5cf6 #f3f4f6;
+        }
+        .table-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f3f4f6;
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body class="min-h-screen">
-    <!-- Header -->
     <header class="glass-card shadow-lg border-b border-gray-100">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
@@ -125,188 +192,212 @@
         </div>
     </header>
 
-    <div class="container mx-auto px-4 py-8 max-w-7xl">
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
         <div class="glass-card rounded-2xl shadow-xl overflow-hidden">
-            <div class="p-8">
-                <!-- Input Section -->
-                <div class="mb-8">
-                    <label class="block text-sm font-bold text-gray-700 mb-3">
+            <div class="p-6">
+                <div class="mb-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">
                         <i class="fas fa-file-alt mr-2 text-purple-600"></i> Enter Data
                     </label>
-                    <p class="text-sm text-gray-600 mb-3">Format: <code class="bg-gray-100 px-2 py-1 rounded">SERVEUR:IP:DOMAIN:STATUS</code> (one per line)</p>
-                    <textarea id="blacklist-input" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="SERVEUR1:192.168.1.1:example.com:ACTIVE&#10;SERVEUR2:10.0.0.1:domain.org:INACTIVE"></textarea>
-                    <div class="mt-3 text-sm text-gray-500">
-                        Or <label class="text-purple-600 cursor-pointer hover:underline font-semibold">
-                            <input type="file" id="blacklist-file" accept=".txt" class="hidden">upload a .txt file
+                    <p class="text-sm text-gray-500 mb-3">Format: <code class="bg-purple-100 text-purple-700 px-2 py-1 rounded font-mono text-xs">SERVEUR:IP:DOMAIN:STATUS</code> (one per line)</p>
+                    <textarea id="blacklist-input" class="input-modern w-full h-32 px-4 py-3 rounded-xl resize-none font-mono text-sm" placeholder="SERVEUR1:192.168.1.1:example.com:ACTIVE&#10;SERVEUR2:10.0.0.1:domain.org:INACTIVE"></textarea>
+                    <div class="mt-2 flex items-center space-x-4">
+                        <label class="text-purple-600 cursor-pointer hover:underline font-semibold text-sm flex items-center">
+                            <i class="fas fa-upload mr-2"></i>
+                            <input type="file" id="blacklist-file" accept=".txt" class="hidden">
+                            Upload .txt file
                         </label>
+                        <span class="text-gray-400">|</span>
+                        <span id="line-count" class="text-sm text-gray-500">0 lines</span>
                     </div>
                 </div>
 
-                <!-- Error/Warning Display -->
-                <div id="errors-section" class="hidden mb-6 p-4 error-box rounded-xl border">
-                    <h3 class="font-bold mb-3 flex items-center">
+                <div id="errors-section" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <h3 class="font-bold text-red-800 mb-2 flex items-center text-sm">
                         <i class="fas fa-exclamation-circle mr-2"></i> Validation Errors
                     </h3>
-                    <ul id="errors-list" class="space-y-2 text-sm"></ul>
+                    <ul id="errors-list" class="space-y-1 text-sm text-red-700 max-h-24 overflow-y-auto"></ul>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="flex gap-4 mb-8">
-                    <button id="check-btn" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl font-semibold">
+                <div class="flex gap-3 mb-6">
+                    <button id="check-btn" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg font-semibold">
                         <i class="fas fa-search"></i>
                         <span>Check Blacklists</span>
                     </button>
-                </div>
-
-                <!-- Statistics Section -->
-                <div id="stats-section" class="hidden mb-8 grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
-                        <div class="text-3xl font-bold mb-1"><span id="stat-css">0</span></div>
-                        <div class="text-sm font-semibold opacity-90">CSS Listed</div>
-                    </div>
-                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
-                        <div class="text-3xl font-bold mb-1"><span id="stat-pbl">0</span></div>
-                        <div class="text-sm font-semibold opacity-90">PBL Listed</div>
-                    </div>
-                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
-                        <div class="text-3xl font-bold mb-1"><span id="stat-xbl">0</span></div>
-                        <div class="text-sm font-semibold opacity-90">XBL Listed</div>
-                    </div>
-                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
-                        <div class="text-3xl font-bold mb-1"><span id="stat-dbl">0</span></div>
-                        <div class="text-sm font-semibold opacity-90">DBL Listed</div>
-                    </div>
-                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
-                        <div class="text-3xl font-bold mb-1"><span id="stat-barracuda">0</span></div>
-                        <div class="text-sm font-semibold opacity-90">Barracuda</div>
-                    </div>
-                </div>
-
-                <!-- Filter Section -->
-                <div id="filter-section" class="hidden mb-6 p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                    <h3 class="font-bold text-gray-800 mb-4 flex items-center">
-                        <i class="fas fa-sliders-h mr-2 text-purple-600"></i> Column Filters
-                    </h3>
-                    <div class="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-3">
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">Serveur</label>
-                            <select class="column-filter select-filter w-full" data-column="serveur">
-                                <option value="">All</option>
-                                <option value="Listed">Listed</option>
-                                <option value="not Listed">Clean</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">CSS</label>
-                            <select class="column-filter select-filter w-full" data-column="css">
-                                <option value="">All</option>
-                                <option value="Listed">Listed</option>
-                                <option value="not Listed">Clean</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">PBL</label>
-                            <select class="column-filter select-filter w-full" data-column="pbl">
-                                <option value="">All</option>
-                                <option value="Listed">Listed</option>
-                                <option value="not Listed">Clean</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">XBL</label>
-                            <select class="column-filter select-filter w-full" data-column="xbl">
-                                <option value="">All</option>
-                                <option value="Listed">Listed</option>
-                                <option value="not Listed">Clean</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">SBL</label>
-                            <select class="column-filter select-filter w-full" data-column="sbl">
-                                <option value="">All</option>
-                                <option value="Listed">Listed</option>
-                                <option value="not Listed">Clean</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">Barracuda</label>
-                            <select class="column-filter select-filter w-full" data-column="barracuda">
-                                <option value="">All</option>
-                                <option value="Listed">Listed</option>
-                                <option value="not Listed">Clean</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">DBL</label>
-                            <select class="column-filter select-filter w-full" data-column="dbl">
-                                <option value="">All</option>
-                                <option value="Listed">Listed</option>
-                                <option value="not Listed">Clean</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-semibold text-gray-700 block mb-1">Status</label>
-                            <select class="column-filter select-filter w-full" data-column="status">
-                                <option value="">All</option>
-                                <option value="ACTIVE">ACTIVE</option>
-                                <option value="PAUSED">PAUSED</option>
-                                <option value="PROD">PROD</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Results Table -->
-                <div id="results-section" class="hidden overflow-x-auto rounded-xl border border-gray-200">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gradient-to-r from-gray-800 to-gray-700 text-white">
-                            <tr>
-                                <th class="px-4 py-4 text-left font-bold">Serveur <i class="fas fa-copy cursor-pointer ml-2 opacity-75 hover:opacity-100"></i></th>
-                                <th class="px-4 py-4 text-left font-bold">IP <i class="fas fa-copy cursor-pointer ml-2 opacity-75 hover:opacity-100"></i></th>
-                                <th class="px-4 py-4 text-left font-bold">Domain <i class="fas fa-copy cursor-pointer ml-2 opacity-75 hover:opacity-100"></i></th>
-                                <th class="px-4 py-4 text-center font-bold">Status</th>
-                                <th class="px-4 py-4 text-center font-bold">CSS</th>
-                                <th class="px-4 py-4 text-center font-bold">PBL</th>
-                                <th class="px-4 py-4 text-center font-bold">XBL</th>
-                                <th class="px-4 py-4 text-center font-bold">SBL</th>
-                                <th class="px-4 py-4 text-center font-bold">Barracuda</th>
-                                <th class="px-4 py-4 text-center font-bold">DBL</th>
-                            </tr>
-                        </thead>
-                        <tbody id="results-body" class="divide-y divide-gray-200">
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Export Buttons -->
-                <div id="export-section" class="hidden mt-8 flex gap-4">
-                    <button id="export-csv-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl font-semibold">
-                        <i class="fas fa-download"></i>
-                        <span>Export CSV (Filtered)</span>
+                    <button id="clear-btn" class="btn-secondary text-white px-4 py-3 rounded-xl flex items-center space-x-2 shadow-lg font-semibold">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Clear</span>
                     </button>
-                    <button id="copy-clean-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl font-semibold">
-                        <i class="fas fa-copy"></i>
-                        <span>Copy Clean IPs</span>
-                    </button>
+                </div>
+
+                <div id="stats-section" class="hidden mb-6">
+                    <div class="grid grid-cols-3 md:grid-cols-6 gap-3">
+                        <div class="stat-card rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-purple-600"><span id="stat-total">0</span></div>
+                            <div class="text-xs font-semibold text-gray-600">Total</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-red-500"><span id="stat-css">0</span></div>
+                            <div class="text-xs font-semibold text-gray-600">CSS</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-orange-500"><span id="stat-pbl">0</span></div>
+                            <div class="text-xs font-semibold text-gray-600">PBL</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-yellow-600"><span id="stat-xbl">0</span></div>
+                            <div class="text-xs font-semibold text-gray-600">XBL</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-pink-500"><span id="stat-barracuda">0</span></div>
+                            <div class="text-xs font-semibold text-gray-600">Barracuda</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-indigo-500"><span id="stat-dbl">0</span></div>
+                            <div class="text-xs font-semibold text-gray-600">DBL</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="filter-section" class="hidden mb-4 p-4 bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-100">
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-gray-700"><i class="fas fa-filter mr-1 text-purple-600"></i>Filters:</span>
+                        </div>
+                        <select class="column-filter select-filter text-sm" data-column="css">
+                            <option value="">CSS: All</option>
+                            <option value="Listed">CSS: Listed</option>
+                            <option value="not Listed">CSS: Clean</option>
+                        </select>
+                        <select class="column-filter select-filter text-sm" data-column="pbl">
+                            <option value="">PBL: All</option>
+                            <option value="Listed">PBL: Listed</option>
+                            <option value="not Listed">PBL: Clean</option>
+                        </select>
+                        <select class="column-filter select-filter text-sm" data-column="xbl">
+                            <option value="">XBL: All</option>
+                            <option value="Listed">XBL: Listed</option>
+                            <option value="not Listed">XBL: Clean</option>
+                        </select>
+                        <select class="column-filter select-filter text-sm" data-column="sbl">
+                            <option value="">SBL: All</option>
+                            <option value="Listed">SBL: Listed</option>
+                            <option value="not Listed">SBL: Clean</option>
+                        </select>
+                        <select class="column-filter select-filter text-sm" data-column="barracuda">
+                            <option value="">Barracuda: All</option>
+                            <option value="Listed">Barracuda: Listed</option>
+                            <option value="not Listed">Barracuda: Clean</option>
+                        </select>
+                        <select class="column-filter select-filter text-sm" data-column="dbl">
+                            <option value="">DBL: All</option>
+                            <option value="Listed">DBL: Listed</option>
+                            <option value="not Listed">DBL: Clean</option>
+                        </select>
+                        <select class="column-filter select-filter text-sm" data-column="status">
+                            <option value="">Status: All</option>
+                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="PAUSED">PAUSED</option>
+                            <option value="PROD">PROD</option>
+                        </select>
+                        <button id="reset-filters-btn" class="text-sm text-purple-600 hover:text-purple-800 font-semibold">
+                            <i class="fas fa-undo mr-1"></i>Reset
+                        </button>
+                    </div>
+                </div>
+
+                <div id="toolbar-section" class="hidden mb-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="relative">
+                                <input type="text" id="search-input" placeholder="Search server, IP, or domain..." class="input-modern pl-10 pr-4 py-2 rounded-lg text-sm w-64">
+                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            </div>
+                            <span id="results-count" class="text-sm text-gray-500"></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="copy-clean-btn" class="btn-success text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm font-semibold shadow">
+                                <i class="fas fa-copy"></i>
+                                <span>Copy Clean IPs</span>
+                            </button>
+                            <button id="export-csv-btn" class="btn-primary text-white px-4 py-2 rounded-lg flex items-center space-x-2 text-sm font-semibold shadow">
+                                <i class="fas fa-download"></i>
+                                <span>Export CSV</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="results-section" class="hidden">
+                    <div class="table-container overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gradient-to-r from-gray-800 to-gray-700 text-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-semibold">Serveur</th>
+                                    <th class="px-4 py-3 text-left font-semibold">IP</th>
+                                    <th class="px-4 py-3 text-left font-semibold">Domain</th>
+                                    <th class="px-4 py-3 text-center font-semibold">Status</th>
+                                    <th class="px-4 py-3 text-center font-semibold">CSS</th>
+                                    <th class="px-4 py-3 text-center font-semibold">PBL</th>
+                                    <th class="px-4 py-3 text-center font-semibold">XBL</th>
+                                    <th class="px-4 py-3 text-center font-semibold">SBL</th>
+                                    <th class="px-4 py-3 text-center font-semibold">Barracuda</th>
+                                    <th class="px-4 py-3 text-center font-semibold">DBL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="results-body" class="divide-y divide-gray-100 bg-white"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="pagination-section" class="mt-4 flex items-center justify-between">
+                        <div class="text-sm text-gray-600">
+                            Showing <span id="showing-start">0</span>-<span id="showing-end">0</span> of <span id="showing-total">0</span> results
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="prev-btn" class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium disabled:opacity-50">
+                                <i class="fas fa-chevron-left mr-1"></i>Prev
+                            </button>
+                            <div id="page-numbers" class="flex gap-1"></div>
+                            <button id="next-btn" class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium disabled:opacity-50">
+                                Next<i class="fas fa-chevron-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="bg-white rounded-2xl p-8 shadow-2xl text-center">
-            <div class="loading-spinner text-red-600 text-5xl mb-4">
-                <i class="fas fa-spinner"></i>
+        <div class="glass-card rounded-2xl p-8 shadow-2xl text-center max-w-sm mx-4">
+            <div class="relative w-24 h-24 mx-auto mb-4">
+                <div class="absolute inset-0 rounded-full border-4 border-purple-200"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-purple-600 border-t-transparent loading-spinner"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <i class="fas fa-shield-virus text-2xl text-purple-600"></i>
+                </div>
             </div>
-            <p class="text-gray-800 text-lg font-semibold">Checking blacklists...</p>
-            <p id="progress-text" class="text-gray-500 text-sm mt-2">Please wait</p>
+            <p class="text-gray-800 text-lg font-bold mb-2">Checking Blacklists</p>
+            <p id="progress-text" class="text-purple-600 font-semibold text-xl mb-1">0 / 0</p>
+            <p class="text-gray-500 text-sm">Processing entries...</p>
+            <div class="mt-4 w-full bg-gray-200 rounded-full h-2">
+                <div id="progress-bar" class="bg-gradient-to-r from-purple-500 to-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
         </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-3 rounded-xl shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2 z-50">
+        <i class="fas fa-check-circle"></i>
+        <span id="toast-message">Copied to clipboard!</span>
     </div>
 
     <script>
         let allResults = [];
+        let filteredResults = [];
         let columnFilters = {};
+        let searchQuery = '';
+        let currentPage = 1;
+        const itemsPerPage = 16;
 
         document.getElementById('blacklist-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -314,109 +405,258 @@
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     document.getElementById('blacklist-input').value = event.target.result;
+                    updateLineCount();
                 };
                 reader.readAsText(file);
             }
         });
 
+        document.getElementById('blacklist-input').addEventListener('input', updateLineCount);
+
+        function updateLineCount() {
+            const lines = document.getElementById('blacklist-input').value.split('\n').filter(l => l.trim()).length;
+            document.getElementById('line-count').textContent = `${lines} line${lines !== 1 ? 's' : ''}`;
+        }
+
         document.getElementById('check-btn').addEventListener('click', checkBlacklists);
+        document.getElementById('clear-btn').addEventListener('click', clearAll);
 
         document.querySelectorAll('.column-filter').forEach(select => {
             select.addEventListener('change', function() {
                 columnFilters[this.dataset.column] = this.value;
-                displayResults(allResults);
+                currentPage = 1;
+                applyFilters();
             });
         });
 
+        document.getElementById('search-input').addEventListener('input', function() {
+            searchQuery = this.value.toLowerCase();
+            currentPage = 1;
+            applyFilters();
+        });
+
+        document.getElementById('reset-filters-btn').addEventListener('click', resetFilters);
         document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
         document.getElementById('copy-clean-btn').addEventListener('click', copyCleanIPs);
+        document.getElementById('prev-btn').addEventListener('click', () => changePage(-1));
+        document.getElementById('next-btn').addEventListener('click', () => changePage(1));
+
+        function clearAll() {
+            document.getElementById('blacklist-input').value = '';
+            updateLineCount();
+            allResults = [];
+            filteredResults = [];
+            columnFilters = {};
+            searchQuery = '';
+            currentPage = 1;
+            document.getElementById('search-input').value = '';
+            resetFilters();
+            document.getElementById('stats-section').classList.add('hidden');
+            document.getElementById('filter-section').classList.add('hidden');
+            document.getElementById('toolbar-section').classList.add('hidden');
+            document.getElementById('results-section').classList.add('hidden');
+            document.getElementById('errors-section').classList.add('hidden');
+        }
+
+        function resetFilters() {
+            columnFilters = {};
+            document.querySelectorAll('.column-filter').forEach(s => s.value = '');
+            currentPage = 1;
+            applyFilters();
+        }
 
         async function checkBlacklists() {
             const input = document.getElementById('blacklist-input').value.trim();
             if (!input) {
-                showError('Please enter data in the required format');
+                showToast('Please enter data in the required format', 'error');
                 return;
             }
 
             const lines = input.split('\n').filter(l => l.trim());
             const overlay = document.getElementById('loading-overlay');
+            const progressText = document.getElementById('progress-text');
+            const progressBar = document.getElementById('progress-bar');
+
             overlay.classList.remove('hidden');
+            progressText.textContent = '0 / ' + lines.length;
+            progressBar.style.width = '0%';
 
             try {
-                const response = await fetch('/api/check_blacklists', {
+                const response = await fetch('/api/check_blacklists_stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ lines: lines })
                 });
 
-                const data = await response.json();
-                
-                if (data.error) {
-                    showError(data.error);
-                } else {
-                    allResults = data.results || [];
-                    columnFilters = {};
-                    
-                    if (allResults.length > 0) {
-                        displayResults(allResults);
-                        updateStatistics(allResults);
-                        document.getElementById('filter-section').classList.remove('hidden');
-                        document.getElementById('export-section').classList.remove('hidden');
-                        document.getElementById('errors-section').classList.add('hidden');
-                    } else {
-                        showError('No valid entries found. Please check your input format.');
-                    }
-                    
-                    if (data.errors && data.errors.length > 0) {
-                        showErrors(data.errors);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop();
+
+                    for (const event of events) {
+                        if (event.startsWith('data: ')) {
+                            const data = JSON.parse(event.slice(6));
+                            
+                            if (data.type === 'start') {
+                                if (data.errors && data.errors.length > 0) {
+                                    showErrors(data.errors);
+                                }
+                            } else if (data.type === 'progress') {
+                                progressText.textContent = data.current + ' / ' + data.total;
+                                progressBar.style.width = ((data.current / data.total) * 100) + '%';
+                            } else if (data.type === 'complete') {
+                                allResults = data.results || [];
+                                columnFilters = {};
+                                searchQuery = '';
+                                currentPage = 1;
+                                
+                                if (allResults.length > 0) {
+                                    applyFilters();
+                                    updateStatistics(allResults);
+                                    document.getElementById('filter-section').classList.remove('hidden');
+                                    document.getElementById('toolbar-section').classList.remove('hidden');
+                                    document.getElementById('stats-section').classList.remove('hidden');
+                                } else {
+                                    showToast('No valid entries found', 'error');
+                                }
+                            }
+                        }
                     }
                 }
             } catch (error) {
-                showError('Error checking blacklists: ' + error.message);
+                showToast('Error checking blacklists: ' + error.message, 'error');
             } finally {
                 overlay.classList.add('hidden');
             }
         }
 
-        function displayResults(results) {
-            const tbody = document.getElementById('results-body');
-            tbody.innerHTML = '';
-
-            const filtered = results.filter(r => {
+        function applyFilters() {
+            filteredResults = allResults.filter(r => {
                 for (let col in columnFilters) {
                     if (columnFilters[col] && r[col] !== columnFilters[col]) {
                         return false;
                     }
                 }
+                if (searchQuery) {
+                    const searchStr = (r.serveur + ' ' + r.ip + ' ' + r.domain).toLowerCase();
+                    if (!searchStr.includes(searchQuery)) {
+                        return false;
+                    }
+                }
                 return true;
             });
+            displayResults();
+        }
 
-            filtered.forEach(row => {
+        function displayResults() {
+            const tbody = document.getElementById('results-body');
+            tbody.innerHTML = '';
+
+            const totalItems = filteredResults.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const startIdx = (currentPage - 1) * itemsPerPage;
+            const endIdx = Math.min(startIdx + itemsPerPage, totalItems);
+            const pageResults = filteredResults.slice(startIdx, endIdx);
+
+            document.getElementById('showing-start').textContent = totalItems > 0 ? startIdx + 1 : 0;
+            document.getElementById('showing-end').textContent = endIdx;
+            document.getElementById('showing-total').textContent = totalItems;
+            document.getElementById('results-count').textContent = `${totalItems} result${totalItems !== 1 ? 's' : ''}`;
+
+            pageResults.forEach(row => {
                 const tr = document.createElement('tr');
-                tr.className = 'result-row hover:bg-gray-50 transition-colors';
+                tr.className = 'result-row transition-colors';
                 
-                const getStatusBadge = (value) => {
+                const getBadge = (value) => {
                     return value === 'Listed' 
-                        ? '<span class="px-3 py-1 rounded-lg text-white text-xs font-bold bg-red-500">Listed</span>'
-                        : '<span class="px-3 py-1 rounded-lg text-white text-xs font-bold bg-green-500">Clean</span>';
+                        ? '<span class="inline-block px-2 py-1 rounded-md text-xs font-bold badge-listed">Listed</span>'
+                        : '<span class="inline-block px-2 py-1 rounded-md text-xs font-bold badge-clean">Clean</span>';
                 };
                 
                 tr.innerHTML = `
-                    <td class="px-4 py-3 font-medium text-gray-900">${row.serveur} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-purple-600 ml-2" onclick="copyToClipboard('${row.serveur}', event)"></i></td>
-                    <td class="px-4 py-3 font-medium text-gray-900">${row.ip} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-purple-600 ml-2" onclick="copyToClipboard('${row.ip}', event)"></i></td>
-                    <td class="px-4 py-3 font-medium text-gray-900">${row.domain} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-purple-600 ml-2" onclick="copyToClipboard('${row.domain}', event)"></i></td>
-                    <td class="px-4 py-3 text-center"><span class="inline-block px-3 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-800">${row.status}</span></td>
-                    <td class="px-4 py-3 text-center">${getStatusBadge(row.css)}</td>
-                    <td class="px-4 py-3 text-center">${getStatusBadge(row.pbl)}</td>
-                    <td class="px-4 py-3 text-center">${getStatusBadge(row.xbl)}</td>
-                    <td class="px-4 py-3 text-center">${getStatusBadge(row.sbl)}</td>
-                    <td class="px-4 py-3 text-center">${getStatusBadge(row.barracuda)}</td>
-                    <td class="px-4 py-3 text-center">${getStatusBadge(row.dbl)}</td>
+                    <td class="px-4 py-3 font-medium text-gray-900">${escapeHtml(row.serveur)}</td>
+                    <td class="px-4 py-3 font-mono text-gray-700">${escapeHtml(row.ip)}</td>
+                    <td class="px-4 py-3 text-gray-700">${escapeHtml(row.domain)}</td>
+                    <td class="px-4 py-3 text-center"><span class="inline-block px-2 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-800">${escapeHtml(row.status)}</span></td>
+                    <td class="px-4 py-3 text-center">${getBadge(row.css)}</td>
+                    <td class="px-4 py-3 text-center">${getBadge(row.pbl)}</td>
+                    <td class="px-4 py-3 text-center">${getBadge(row.xbl)}</td>
+                    <td class="px-4 py-3 text-center">${getBadge(row.sbl)}</td>
+                    <td class="px-4 py-3 text-center">${getBadge(row.barracuda)}</td>
+                    <td class="px-4 py-3 text-center">${getBadge(row.dbl)}</td>
                 `;
                 tbody.appendChild(tr);
             });
 
+            updatePagination(totalPages);
             document.getElementById('results-section').classList.remove('hidden');
+        }
+
+        function updatePagination(totalPages) {
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const pageNumbers = document.getElementById('page-numbers');
+
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
+
+            pageNumbers.innerHTML = '';
+            
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, currentPage + 2);
+            
+            if (startPage > 1) {
+                pageNumbers.appendChild(createPageBtn(1));
+                if (startPage > 2) {
+                    const dots = document.createElement('span');
+                    dots.className = 'px-2 text-gray-400';
+                    dots.textContent = '...';
+                    pageNumbers.appendChild(dots);
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                pageNumbers.appendChild(createPageBtn(i));
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const dots = document.createElement('span');
+                    dots.className = 'px-2 text-gray-400';
+                    dots.textContent = '...';
+                    pageNumbers.appendChild(dots);
+                }
+                pageNumbers.appendChild(createPageBtn(totalPages));
+            }
+        }
+
+        function createPageBtn(pageNum) {
+            const btn = document.createElement('button');
+            btn.className = `pagination-btn px-3 py-2 rounded-lg border text-sm font-medium ${
+                pageNum === currentPage 
+                    ? 'active border-purple-600' 
+                    : 'border-gray-300 bg-white hover:border-purple-400'
+            }`;
+            btn.textContent = pageNum;
+            btn.addEventListener('click', () => goToPage(pageNum));
+            return btn;
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            displayResults();
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            displayResults();
         }
 
         function updateStatistics(results) {
@@ -429,24 +669,18 @@
                 if (r.dbl === 'Listed') stats.dbl++;
                 if (r.barracuda === 'Listed') stats.barracuda++;
             });
+            document.getElementById('stat-total').textContent = results.length;
             document.getElementById('stat-css').textContent = stats.css;
             document.getElementById('stat-pbl').textContent = stats.pbl;
             document.getElementById('stat-xbl').textContent = stats.xbl;
             document.getElementById('stat-dbl').textContent = stats.dbl;
             document.getElementById('stat-barracuda').textContent = stats.barracuda;
-            document.getElementById('stats-section').classList.remove('hidden');
         }
 
-        function copyToClipboard(text, event) {
-            event.stopPropagation();
-            navigator.clipboard.writeText(text).then(() => {
-                const icon = event.target;
-                const originalClass = icon.className;
-                icon.className = icon.className.replace('text-gray-400 hover:text-purple-600', 'text-green-500');
-                setTimeout(() => {
-                    icon.className = originalClass;
-                }, 1500);
-            });
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function copyCleanIPs() {
@@ -457,59 +691,66 @@
                 .join('\n');
             
             if (!cleanIPs) {
-                showError('No clean IPs found');
+                showToast('No clean IPs found', 'error');
                 return;
             }
             
             navigator.clipboard.writeText(cleanIPs).then(() => {
-                const btn = document.getElementById('copy-clean-btn');
-                const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check"></i><span>Copied!</span>';
-                setTimeout(() => {
-                    btn.innerHTML = originalHTML;
-                }, 2000);
+                const count = cleanIPs.split('\n').length;
+                showToast(`Copied ${count} clean IP${count !== 1 ? 's' : ''} to clipboard!`);
             });
         }
 
         function exportCSV() {
-            const filtered = allResults.filter(r => {
-                for (let col in columnFilters) {
-                    if (columnFilters[col] && r[col] !== columnFilters[col]) {
-                        return false;
-                    }
-                }
-                return true;
-            });
+            if (filteredResults.length === 0) {
+                showToast('No results to export', 'error');
+                return;
+            }
 
-            let csv = 'Serveur,IP,Domain,Status,CSS,PBL,XBL,SBL,Barracuda,DBL\n';
-            filtered.forEach(r => {
-                csv += `"${r.serveur}","${r.ip}","${r.domain}","${r.status}","${r.css}","${r.pbl}","${r.xbl}","${r.sbl}","${r.barracuda}","${r.dbl}"\n`;
-            });
+            const headers = ['Serveur', 'IP', 'Domain', 'Status', 'CSS', 'PBL', 'XBL', 'SBL', 'Barracuda', 'DBL'];
+            const csvContent = [
+                headers.join(','),
+                ...filteredResults.map(r => [
+                    `"${r.serveur}"`, `"${r.ip}"`, `"${r.domain}"`, `"${r.status}"`,
+                    r.css, r.pbl, r.xbl, r.sbl, r.barracuda, r.dbl
+                ].join(','))
+            ].join('\n');
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'blacklist_results_' + new Date().toISOString().split('T')[0] + '.csv');
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        function showError(message) {
-            const errDiv = document.getElementById('errors-section');
-            const errList = document.getElementById('errors-list');
-            errList.innerHTML = `<li>${message}</li>`;
-            errDiv.classList.remove('hidden');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `blacklist_results_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV exported successfully!');
         }
 
         function showErrors(errors) {
-            const errDiv = document.getElementById('errors-section');
-            const errList = document.getElementById('errors-list');
-            errList.innerHTML = errors.map(e => `<li>${e}</li>`).join('');
-            errDiv.classList.remove('hidden');
+            const section = document.getElementById('errors-section');
+            const list = document.getElementById('errors-list');
+            list.innerHTML = errors.map(e => `<li><i class="fas fa-times-circle mr-1"></i>${escapeHtml(e)}</li>`).join('');
+            section.classList.remove('hidden');
         }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            
+            toast.className = toast.className.replace(/bg-\w+-500/g, '');
+            toast.classList.add(type === 'error' ? 'bg-red-500' : 'bg-green-500');
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        updateLineCount();
     </script>
 </body>
 </html>

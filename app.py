@@ -2363,8 +2363,8 @@ def blacklist_lookup():
         return redirect(url_for('services'))
     return render_template('blacklist_lookup.html')
 
-# Spamhaus DQS Key
-DQS_KEY = "f3jqdoqpeyipweiizk7onufnlm"
+# Spamhaus DQS Key from environment
+DQS_KEY = os.environ.get("DQS_KEY", "")
 
 def check_spamhaus_ip(ip):
     """Check IP against Spamhaus blocklists (CSS, PBL, XBL, SBL)"""
@@ -2415,10 +2415,35 @@ def check_spamhaus_domain(domain):
         logging.debug(f"Error checking domain {domain}: {e}")
         return None
 
-@app.route('/api/check_blacklists', methods=['POST'])
+def check_single_entry(entry_data):
+    """Check a single IP/domain entry against all blacklists - for parallel processing"""
+    idx, serveur, ip, domain, status = entry_data
+    
+    # Check IP blocklists
+    spamhaus_ip = check_spamhaus_ip(ip)
+    barracuda_result = check_barracuda(ip)
+    
+    # Check domain blocklists
+    dbl_result = check_spamhaus_domain(domain)
+    
+    return {
+        'idx': idx,
+        'serveur': serveur,
+        'ip': ip,
+        'domain': domain,
+        'status': status,
+        'css': 'Listed' if spamhaus_ip == 'css' else 'not Listed',
+        'pbl': 'Listed' if spamhaus_ip == 'pbl' else 'not Listed',
+        'xbl': 'Listed' if spamhaus_ip == 'xbl' else 'not Listed',
+        'sbl': 'Listed' if spamhaus_ip == 'sbl' else 'not Listed',
+        'barracuda': 'Listed' if barracuda_result else 'not Listed',
+        'dbl': 'Listed' if dbl_result == 'dbl' else 'not Listed'
+    }
+
+@app.route('/api/check_blacklists_stream', methods=['POST'])
 @login_required
-def check_blacklists_api():
-    """API endpoint to check IPs and domains against blacklists"""
+def check_blacklists_stream():
+    """SSE streaming endpoint for blacklist checks with parallel processing"""
     if not current_user.has_blacklist_lookup_permission:
         return jsonify({'error': 'Permission denied'}), 403
     
@@ -2429,24 +2454,23 @@ def check_blacklists_api():
         if not lines:
             return jsonify({'error': 'No data provided'}), 400
         
-        results = []
+        # Parse and validate all lines first
+        valid_entries = []
         errors = []
         
         for idx, line in enumerate(lines):
             line = line.strip()
             
-            # Skip empty lines
             if not line:
                 continue
             
-            # Check format
             if ':' not in line:
-                errors.append(f"Line {idx + 1}: Missing ':' separator - format must be SERVEUR:IP:DOMAIN:STATUS")
+                errors.append(f"Line {idx + 1}: Missing ':' separator")
                 continue
             
             parts = line.split(':')
             if len(parts) != 4:
-                errors.append(f"Line {idx + 1}: Invalid format - expected 4 fields (SERVEUR:IP:DOMAIN:STATUS), got {len(parts)}")
+                errors.append(f"Line {idx + 1}: Invalid format - expected 4 fields")
                 continue
             
             serveur = parts[0].strip()
@@ -2459,58 +2483,68 @@ def check_blacklists_api():
             try:
                 octets = ip.split('.')
                 if len(octets) != 4:
-                    errors.append(f"Line {idx + 1}: Invalid IP address '{ip}' - must have 4 octets")
+                    errors.append(f"Line {idx + 1}: Invalid IP '{ip}'")
                     valid_ip = False
                 else:
                     for octet in octets:
                         val = int(octet)
                         if val < 0 or val > 255:
-                            errors.append(f"Line {idx + 1}: Invalid IP address '{ip}' - octet '{octet}' out of range (0-255)")
                             valid_ip = False
                             break
             except ValueError:
-                errors.append(f"Line {idx + 1}: Invalid IP address '{ip}' - contains non-numeric values")
                 valid_ip = False
             
             if not valid_ip:
                 continue
             
-            # Validate domain format (basic check)
             if '.' not in domain or len(domain) < 3:
-                errors.append(f"Line {idx + 1}: Invalid domain '{domain}' - must contain at least one dot")
+                errors.append(f"Line {idx + 1}: Invalid domain '{domain}'")
                 continue
             
-            # Check IP blocklists
-            spamhaus_ip = check_spamhaus_ip(ip)
-            barracuda_result = check_barracuda(ip)
+            valid_entries.append((idx, serveur, ip, domain, status))
+        
+        total = len(valid_entries)
+        
+        def generate():
+            yield f"data: {json.dumps({'type': 'start', 'total': total, 'errors': errors})}\n\n"
             
-            # Check domain blocklists
-            dbl_result = check_spamhaus_domain(domain)
+            results = []
+            completed = 0
             
-            # Build result row
-            result_row = {
-                'serveur': serveur,
-                'ip': ip,
-                'domain': domain,
-                'status': status,
-                'css': 'Listed' if spamhaus_ip == 'css' else 'not Listed',
-                'pbl': 'Listed' if spamhaus_ip == 'pbl' else 'not Listed',
-                'xbl': 'Listed' if spamhaus_ip == 'xbl' else 'not Listed',
-                'sbl': 'Listed' if spamhaus_ip == 'sbl' else 'not Listed',
-                'barracuda': 'Listed' if barracuda_result else 'not Listed',
-                'dbl': 'Listed' if dbl_result == 'dbl' else 'not Listed'
+            # Use ThreadPoolExecutor for parallel processing (up to 30 concurrent)
+            with ThreadPoolExecutor(max_workers=30) as executor:
+                futures = {executor.submit(check_single_entry, entry): entry for entry in valid_entries}
+                
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        logging.debug(f"Error processing entry: {e}")
+                    
+                    completed += 1
+                    yield f"data: {json.dumps({'type': 'progress', 'current': completed, 'total': total})}\n\n"
+            
+            # Sort results by original index
+            results.sort(key=lambda x: x['idx'])
+            # Remove idx from results
+            for r in results:
+                del r['idx']
+            
+            yield f"data: {json.dumps({'type': 'complete', 'results': results})}\n\n"
+        
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+                'Connection': 'keep-alive'
             }
-            
-            results.append(result_row)
-        
-        response = {'results': results}
-        if errors:
-            response['errors'] = errors
-        
-        return jsonify(response)
+        )
     
     except Exception as e:
-        logging.error(f"Error in check_blacklists_api: {e}")
+        logging.error(f"Error in check_blacklists_stream: {e}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 if __name__ == '__main__':
