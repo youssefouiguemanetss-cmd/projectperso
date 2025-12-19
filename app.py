@@ -2374,41 +2374,37 @@ def blacklist_lookup():
 # Spamhaus DQS Key from environment
 DQS_KEY = os.environ.get("DQS_KEY", "")
 
+# Regex patterns for validation (same as ipchecker.py)
+import re
+IP_REGEX = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
+DOMAIN_REGEX = re.compile(r"^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$")
+
 def check_spamhaus_ip(ip):
-    """Check IP against Spamhaus blocklists (CSS, PBL, XBL, SBL) - returns dict with all results
-    Uses DQS key for reliable results. Returns status for each blacklist.
-    """
-    result = {'css': False, 'sbl': False, 'xbl': False, 'pbl': False, 'error': False}
+    """Check IP against Spamhaus blocklists - EXACT copy from ipchecker.py"""
     try:
         rev = ".".join(ip.split(".")[::-1])
         query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
         answers = blacklist_resolver.resolve(query, "A")
         found = {r.to_text() for r in answers}
-        
-        # Check each blacklist independently - IP can be on multiple lists
+
         if "127.0.0.3" in found:
-            result['css'] = True
+            return "css"
         if "127.0.0.2" in found or "127.0.0.9" in found:
-            result['sbl'] = True
+            return "sbl"
         if found.intersection({"127.0.0.4", "127.0.0.5", "127.0.0.6", "127.0.0.7"}):
-            result['xbl'] = True
+            return "xbl"
         if "127.0.0.10" in found or "127.0.0.11" in found:
-            result['pbl'] = True
-        # Catch any other 127.0.0.x response as SBL (fallback)
-        if any(r.startswith("127.0.0.") for r in found) and not any([result['css'], result['sbl'], result['xbl'], result['pbl']]):
-            result['sbl'] = True
-        
-        return result
+            return "pbl"
+        if any(r.startswith("127.0.0.") for r in found):
+            return "sbl"
+        return None
     except dns.resolver.NXDOMAIN:
-        # NXDOMAIN means not listed - this is clean
-        return result
-    except Exception as e:
-        logging.debug(f"Error checking IP {ip}: {e}")
-        result['error'] = True
-        return result
+        return "clean"
+    except Exception:
+        return None
 
 def check_barracuda(ip):
-    """Check IP against Barracuda blocklist"""
+    """Check IP against Barracuda blocklist - EXACT copy from ipchecker.py"""
     try:
         rev = ".".join(ip.split(".")[::-1])
         query = f"{rev}.b.barracudacentral.org"
@@ -2420,45 +2416,57 @@ def check_barracuda(ip):
         return False
 
 def check_spamhaus_domain(domain):
-    """Check domain against Spamhaus DBL using DQS key"""
+    """Check domain against Spamhaus DBL - EXACT copy from ipchecker.py"""
     try:
         query = f"{domain}.{DQS_KEY}.dbl.dq.spamhaus.net"
         answers = blacklist_resolver.resolve(query, "A")
-        # Any 127.0.1.x response means listed in DBL
         if any(r.to_text().startswith("127.0.1.") for r in answers):
             return "dbl"
-        return "clean"
+        return None
     except dns.resolver.NXDOMAIN:
-        # NXDOMAIN means domain is not listed - clean
         return "clean"
-    except Exception as e:
-        logging.debug(f"Error checking domain {domain}: {e}")
-        return "error"
+    except Exception:
+        return None
 
 def check_single_entry(entry_data):
-    """Check a single IP/domain entry against all blacklists - for parallel processing"""
+    """Check a single IP/domain entry against all blacklists - for parallel processing
+    Uses EXACT same logic as ipchecker.py process_item function"""
     idx, serveur, ip, domain, status = entry_data
     
-    # Check IP blocklists - returns dict with css, sbl, xbl, pbl as booleans
-    spamhaus_results = check_spamhaus_ip(ip)
-    barracuda_result = check_barracuda(ip)
-    
-    # Check domain blocklists
-    dbl_result = check_spamhaus_domain(domain)
-    
-    return {
+    # Initialize result
+    result = {
         'idx': idx,
         'serveur': serveur,
-        'ip': ip,
-        'domain': domain,
+        'ip': ip if ip else '',
+        'domain': domain if domain else '',
         'status': status,
-        'css': 'Listed' if spamhaus_results['css'] else 'Clean',
-        'pbl': 'Listed' if spamhaus_results['pbl'] else 'Clean',
-        'xbl': 'Listed' if spamhaus_results['xbl'] else 'Clean',
-        'sbl': 'Listed' if spamhaus_results['sbl'] else 'Clean',
-        'barracuda': 'Listed' if barracuda_result else 'Clean',
-        'dbl': 'Listed' if dbl_result == 'dbl' else 'Clean'
+        'css': 'Clean',
+        'pbl': 'Clean',
+        'xbl': 'Clean',
+        'sbl': 'Clean',
+        'barracuda': 'Clean',
+        'dbl': 'Clean'
     }
+    
+    # Check IP blocklists only if IP is provided (same logic as ipchecker.py)
+    if ip:
+        spamhaus_ip = check_spamhaus_ip(ip)
+        barracuda = check_barracuda(ip)
+        
+        # Map spamhaus result to the correct column
+        if spamhaus_ip and spamhaus_ip != "clean":
+            result[spamhaus_ip] = 'Listed'
+        
+        if barracuda:
+            result['barracuda'] = 'Listed'
+    
+    # Check domain blocklist only if domain is provided
+    if domain:
+        dbl_result = check_spamhaus_domain(domain)
+        if dbl_result == "dbl":
+            result['dbl'] = 'Listed'
+    
+    return result
 
 @app.route('/api/check_blacklists_stream', methods=['POST'])
 @login_required
@@ -2474,7 +2482,7 @@ def check_blacklists_stream():
         if not lines:
             return jsonify({'error': 'No data provided'}), 400
         
-        # Parse and validate all lines first
+        # Parse and validate all lines using same logic as ipchecker.py
         valid_entries = []
         errors = []
         
@@ -2484,41 +2492,72 @@ def check_blacklists_stream():
             if not line:
                 continue
             
-            if ':' not in line:
-                errors.append(f"Line {idx + 1}: Missing ':' separator")
-                continue
+            # Split on colons - support multiple formats like ipchecker.py
+            parts = line.split(":")
             
-            parts = line.split(':')
-            if len(parts) != 4:
-                errors.append(f"Line {idx + 1}: Invalid format - expected 4 fields")
-                continue
+            serveur = ""
+            ip = ""
+            domain = ""
+            status = ""
             
-            serveur = parts[0].strip()
-            ip = parts[1].strip()
-            domain = parts[2].strip()
-            status = parts[3].strip()
-            
-            # Validate IP format
-            valid_ip = True
-            try:
-                octets = ip.split('.')
-                if len(octets) != 4:
-                    errors.append(f"Line {idx + 1}: Invalid IP '{ip}'")
-                    valid_ip = False
+            if len(parts) == 4:
+                # Format: SERVEUR:IP:DOMAIN:STATUS
+                serveur = parts[0].strip()
+                ip = parts[1].strip()
+                domain = parts[2].strip()
+                status = parts[3].strip()
+            elif len(parts) == 3:
+                # Format: SERVEUR:IP:DOMAIN
+                serveur = parts[0].strip()
+                ip = parts[1].strip()
+                domain = parts[2].strip()
+                status = ""
+            elif len(parts) == 2:
+                # Format: SERVEUR:VALUE (IP or Domain)
+                serveur = parts[0].strip()
+                value = parts[1].strip()
+                if IP_REGEX.match(value):
+                    ip = value
+                    domain = ""
+                elif DOMAIN_REGEX.match(value):
+                    ip = ""
+                    domain = value
                 else:
-                    for octet in octets:
-                        val = int(octet)
-                        if val < 0 or val > 255:
-                            valid_ip = False
-                            break
-            except ValueError:
-                valid_ip = False
-            
-            if not valid_ip:
+                    errors.append(f"Line {idx + 1}: Invalid IP or domain '{value}'")
+                    continue
+            elif len(parts) == 1:
+                # Format: Just IP or Domain
+                value = parts[0].strip()
+                if IP_REGEX.match(value):
+                    serveur = "unknown"
+                    ip = value
+                    domain = ""
+                elif DOMAIN_REGEX.match(value):
+                    serveur = "unknown"
+                    ip = ""
+                    domain = value
+                else:
+                    errors.append(f"Line {idx + 1}: Invalid format")
+                    continue
+            else:
+                errors.append(f"Line {idx + 1}: Too many colons in line")
                 continue
             
-            if '.' not in domain or len(domain) < 3:
-                errors.append(f"Line {idx + 1}: Invalid domain '{domain}'")
+            # Validate IP format if provided
+            if ip:
+                if not IP_REGEX.match(ip):
+                    errors.append(f"Line {idx + 1}: Invalid IP '{ip}'")
+                    continue
+            
+            # Validate domain format if provided
+            if domain:
+                if not DOMAIN_REGEX.match(domain):
+                    errors.append(f"Line {idx + 1}: Invalid domain '{domain}'")
+                    continue
+            
+            # Need at least IP or domain
+            if not ip and not domain:
+                errors.append(f"Line {idx + 1}: No valid IP or domain found")
                 continue
             
             valid_entries.append((idx, serveur, ip, domain, status))
