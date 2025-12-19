@@ -45,14 +45,6 @@
             border-color: #8b5cf6;
             box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
         }
-        .badge-listed {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        .badge-clean {
-            background: #dcfce7;
-            color: #166534;
-        }
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -61,7 +53,7 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.7);
             display: flex;
-            items-align: center;
+            align-items: center;
             justify-content: center;
             z-index: 1000;
         }
@@ -75,17 +67,30 @@
         .result-row:hover {
             background: #f9fafb;
         }
-        .stats-badge {
+        .stat-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 0.5rem 1rem;
+        }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .error-box { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        .warning-box { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+        .select-filter {
+            padding: 0.375rem 0.75rem;
+            border: 2px solid #e5e7eb;
             border-radius: 0.5rem;
-            font-weight: 600;
             font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        .select-filter:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
         }
     </style>
 </head>
 <body class="min-h-screen">
+    <!-- Header -->
     <header class="glass-card shadow-lg border-b border-gray-100">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
@@ -123,88 +128,163 @@
     <div class="container mx-auto px-4 py-8 max-w-7xl">
         <div class="glass-card rounded-2xl shadow-xl overflow-hidden">
             <div class="p-8">
+                <!-- Input Section -->
                 <div class="mb-8">
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-list mr-1"></i> Enter Data (Format: SERVEUR:IP:DOMAIN:STATUS, one per line)
+                    <label class="block text-sm font-bold text-gray-700 mb-3">
+                        <i class="fas fa-file-alt mr-2 text-purple-600"></i> Enter Data
                     </label>
-                    <textarea id="blacklist-input" class="input-modern w-full h-32 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="SERVEUR1:192.168.1.1:example.com:ACTIVE&#10;SERVEUR2:10.0.0.1:domain.org:INACTIVE"></textarea>
-                    <div class="mt-2 text-sm text-gray-500">
-                        Or <label class="text-purple-600 cursor-pointer hover:underline">
+                    <p class="text-sm text-gray-600 mb-3">Format: <code class="bg-gray-100 px-2 py-1 rounded">SERVEUR:IP:DOMAIN:STATUS</code> (one per line)</p>
+                    <textarea id="blacklist-input" class="input-modern w-full h-40 px-4 py-3 rounded-xl focus:outline-none resize-none" placeholder="SERVEUR1:192.168.1.1:example.com:ACTIVE&#10;SERVEUR2:10.0.0.1:domain.org:INACTIVE"></textarea>
+                    <div class="mt-3 text-sm text-gray-500">
+                        Or <label class="text-purple-600 cursor-pointer hover:underline font-semibold">
                             <input type="file" id="blacklist-file" accept=".txt" class="hidden">upload a .txt file
                         </label>
                     </div>
                 </div>
 
+                <!-- Error/Warning Display -->
+                <div id="errors-section" class="hidden mb-6 p-4 error-box rounded-xl border">
+                    <h3 class="font-bold mb-3 flex items-center">
+                        <i class="fas fa-exclamation-circle mr-2"></i> Validation Errors
+                    </h3>
+                    <ul id="errors-list" class="space-y-2 text-sm"></ul>
+                </div>
+
+                <!-- Action Buttons -->
                 <div class="flex gap-4 mb-8">
-                    <button id="check-btn" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                    <button id="check-btn" class="btn-primary text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl font-semibold">
                         <i class="fas fa-search"></i>
                         <span>Check Blacklists</span>
                     </button>
                 </div>
 
                 <!-- Statistics Section -->
-                <div id="stats-section" class="hidden mb-8 p-6 bg-gray-50 rounded-xl border border-gray-200">
-                    <h3 class="text-lg font-bold text-gray-800 mb-4">Blacklist Summary</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div class="text-center">
-                            <div class="stats-badge">CSS: <span id="stat-css">0</span></div>
-                        </div>
-                        <div class="text-center">
-                            <div class="stats-badge">PBL: <span id="stat-pbl">0</span></div>
-                        </div>
-                        <div class="text-center">
-                            <div class="stats-badge">XBL: <span id="stat-xbl">0</span></div>
-                        </div>
-                        <div class="text-center">
-                            <div class="stats-badge">DBL: <span id="stat-dbl">0</span></div>
-                        </div>
-                        <div class="text-center">
-                            <div class="stats-badge">Barracuda: <span id="stat-barracuda">0</span></div>
-                        </div>
+                <div id="stats-section" class="hidden mb-8 grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
+                        <div class="text-3xl font-bold mb-1"><span id="stat-css">0</span></div>
+                        <div class="text-sm font-semibold opacity-90">CSS Listed</div>
+                    </div>
+                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
+                        <div class="text-3xl font-bold mb-1"><span id="stat-pbl">0</span></div>
+                        <div class="text-sm font-semibold opacity-90">PBL Listed</div>
+                    </div>
+                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
+                        <div class="text-3xl font-bold mb-1"><span id="stat-xbl">0</span></div>
+                        <div class="text-sm font-semibold opacity-90">XBL Listed</div>
+                    </div>
+                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
+                        <div class="text-3xl font-bold mb-1"><span id="stat-dbl">0</span></div>
+                        <div class="text-sm font-semibold opacity-90">DBL Listed</div>
+                    </div>
+                    <div class="stat-card rounded-xl p-4 text-center shadow-lg">
+                        <div class="text-3xl font-bold mb-1"><span id="stat-barracuda">0</span></div>
+                        <div class="text-sm font-semibold opacity-90">Barracuda</div>
                     </div>
                 </div>
 
                 <!-- Filter Section -->
-                <div id="filter-section" class="hidden mb-8 p-4 bg-gray-100 rounded-xl">
-                    <label class="block text-sm font-semibold text-gray-700 mb-3">
-                        <i class="fas fa-filter mr-1"></i> Filter Results by Status
-                    </label>
-                    <div class="flex gap-2 flex-wrap">
-                        <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border-2 border-purple-600 text-purple-600 active" data-filter="all">All</button>
-                        <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border-2 border-gray-300 text-gray-600" data-filter="listed">Listed</button>
-                        <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border-2 border-gray-300 text-gray-600" data-filter="clean">Clean</button>
+                <div id="filter-section" class="hidden mb-6 p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-sliders-h mr-2 text-purple-600"></i> Column Filters
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-3">
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">Serveur</label>
+                            <select class="column-filter select-filter w-full" data-column="serveur">
+                                <option value="">All</option>
+                                <option value="Listed">Listed</option>
+                                <option value="not Listed">Clean</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">CSS</label>
+                            <select class="column-filter select-filter w-full" data-column="css">
+                                <option value="">All</option>
+                                <option value="Listed">Listed</option>
+                                <option value="not Listed">Clean</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">PBL</label>
+                            <select class="column-filter select-filter w-full" data-column="pbl">
+                                <option value="">All</option>
+                                <option value="Listed">Listed</option>
+                                <option value="not Listed">Clean</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">XBL</label>
+                            <select class="column-filter select-filter w-full" data-column="xbl">
+                                <option value="">All</option>
+                                <option value="Listed">Listed</option>
+                                <option value="not Listed">Clean</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">SBL</label>
+                            <select class="column-filter select-filter w-full" data-column="sbl">
+                                <option value="">All</option>
+                                <option value="Listed">Listed</option>
+                                <option value="not Listed">Clean</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">Barracuda</label>
+                            <select class="column-filter select-filter w-full" data-column="barracuda">
+                                <option value="">All</option>
+                                <option value="Listed">Listed</option>
+                                <option value="not Listed">Clean</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">DBL</label>
+                            <select class="column-filter select-filter w-full" data-column="dbl">
+                                <option value="">All</option>
+                                <option value="Listed">Listed</option>
+                                <option value="not Listed">Clean</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700 block mb-1">Status</label>
+                            <select class="column-filter select-filter w-full" data-column="status">
+                                <option value="">All</option>
+                                <option value="ACTIVE">ACTIVE</option>
+                                <option value="PAUSED">PAUSED</option>
+                                <option value="PROD">PROD</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Results Table -->
-                <div id="results-section" class="hidden overflow-x-auto">
+                <div id="results-section" class="hidden overflow-x-auto rounded-xl border border-gray-200">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-100 border-b border-gray-300">
+                        <thead class="bg-gradient-to-r from-gray-800 to-gray-700 text-white">
                             <tr>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-800">Serveur <i class="fas fa-copy cursor-pointer text-gray-500 hover:text-gray-800 ml-2"></i></th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-800">IP <i class="fas fa-copy cursor-pointer text-gray-500 hover:text-gray-800 ml-2"></i></th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-800">Domain <i class="fas fa-copy cursor-pointer text-gray-500 hover:text-gray-800 ml-2"></i></th>
-                                <th class="px-4 py-3 text-left font-semibold text-gray-800">Status</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-800">CSS</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-800">PBL</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-800">XBL</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-800">SBL</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-800">Barracuda</th>
-                                <th class="px-4 py-3 text-center font-semibold text-gray-800">DBL</th>
+                                <th class="px-4 py-4 text-left font-bold">Serveur <i class="fas fa-copy cursor-pointer ml-2 opacity-75 hover:opacity-100"></i></th>
+                                <th class="px-4 py-4 text-left font-bold">IP <i class="fas fa-copy cursor-pointer ml-2 opacity-75 hover:opacity-100"></i></th>
+                                <th class="px-4 py-4 text-left font-bold">Domain <i class="fas fa-copy cursor-pointer ml-2 opacity-75 hover:opacity-100"></i></th>
+                                <th class="px-4 py-4 text-center font-bold">Status</th>
+                                <th class="px-4 py-4 text-center font-bold">CSS</th>
+                                <th class="px-4 py-4 text-center font-bold">PBL</th>
+                                <th class="px-4 py-4 text-center font-bold">XBL</th>
+                                <th class="px-4 py-4 text-center font-bold">SBL</th>
+                                <th class="px-4 py-4 text-center font-bold">Barracuda</th>
+                                <th class="px-4 py-4 text-center font-bold">DBL</th>
                             </tr>
                         </thead>
-                        <tbody id="results-body">
+                        <tbody id="results-body" class="divide-y divide-gray-200">
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Export Buttons -->
                 <div id="export-section" class="hidden mt-8 flex gap-4">
-                    <button id="export-csv-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                    <button id="export-csv-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl font-semibold">
                         <i class="fas fa-download"></i>
                         <span>Export CSV (Filtered)</span>
                     </button>
-                    <button id="copy-clean-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                    <button id="copy-clean-btn" class="btn-success text-white px-6 py-3 rounded-xl flex items-center space-x-2 shadow-lg hover:shadow-xl font-semibold">
                         <i class="fas fa-copy"></i>
                         <span>Copy Clean IPs</span>
                     </button>
@@ -215,18 +295,18 @@
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="text-center">
-            <div class="loading-spinner text-white text-5xl mb-4">
+        <div class="bg-white rounded-2xl p-8 shadow-2xl text-center">
+            <div class="loading-spinner text-red-600 text-5xl mb-4">
                 <i class="fas fa-spinner"></i>
             </div>
-            <p id="progress-text" class="text-white text-lg font-semibold">Processing...</p>
+            <p class="text-gray-800 text-lg font-semibold">Checking blacklists...</p>
+            <p id="progress-text" class="text-gray-500 text-sm mt-2">Please wait</p>
         </div>
     </div>
 
     <script>
-        const DQS_KEY = "f3jqdoqpeyipweiizk7onufnlm";
         let allResults = [];
-        let currentFilter = 'all';
+        let columnFilters = {};
 
         document.getElementById('blacklist-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -241,11 +321,9 @@
 
         document.getElementById('check-btn').addEventListener('click', checkBlacklists);
 
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active', 'border-purple-600', 'text-purple-600'));
-                this.classList.add('active', 'border-purple-600', 'text-purple-600');
-                currentFilter = this.dataset.filter;
+        document.querySelectorAll('.column-filter').forEach(select => {
+            select.addEventListener('change', function() {
+                columnFilters[this.dataset.column] = this.value;
                 displayResults(allResults);
             });
         });
@@ -256,7 +334,7 @@
         async function checkBlacklists() {
             const input = document.getElementById('blacklist-input').value.trim();
             if (!input) {
-                alert('Please enter data in the required format');
+                showError('Please enter data in the required format');
                 return;
             }
 
@@ -274,16 +352,27 @@
                 const data = await response.json();
                 
                 if (data.error) {
-                    alert('Error: ' + data.error);
+                    showError(data.error);
                 } else {
                     allResults = data.results || [];
-                    displayResults(allResults);
-                    updateStatistics(allResults);
-                    document.getElementById('filter-section').classList.remove('hidden');
-                    document.getElementById('export-section').classList.remove('hidden');
+                    columnFilters = {};
+                    
+                    if (allResults.length > 0) {
+                        displayResults(allResults);
+                        updateStatistics(allResults);
+                        document.getElementById('filter-section').classList.remove('hidden');
+                        document.getElementById('export-section').classList.remove('hidden');
+                        document.getElementById('errors-section').classList.add('hidden');
+                    } else {
+                        showError('No valid entries found. Please check your input format.');
+                    }
+                    
+                    if (data.errors && data.errors.length > 0) {
+                        showErrors(data.errors);
+                    }
                 }
             } catch (error) {
-                alert('Error checking blacklists: ' + error.message);
+                showError('Error checking blacklists: ' + error.message);
             } finally {
                 overlay.classList.add('hidden');
             }
@@ -294,28 +383,35 @@
             tbody.innerHTML = '';
 
             const filtered = results.filter(r => {
-                if (currentFilter === 'all') return true;
-                const isListed = r.css === 'Listed' || r.pbl === 'Listed' || r.xbl === 'Listed' || r.sbl === 'Listed' || r.barracuda === 'Listed' || r.dbl === 'Listed';
-                return currentFilter === 'listed' ? isListed : !isListed;
+                for (let col in columnFilters) {
+                    if (columnFilters[col] && r[col] !== columnFilters[col]) {
+                        return false;
+                    }
+                }
+                return true;
             });
 
             filtered.forEach(row => {
                 const tr = document.createElement('tr');
-                tr.className = 'result-row border-b border-gray-200 hover:bg-gray-50';
+                tr.className = 'result-row hover:bg-gray-50 transition-colors';
                 
-                const isListed = row.css === 'Listed' || row.pbl === 'Listed' || row.xbl === 'Listed' || row.sbl === 'Listed' || row.barracuda === 'Listed' || row.dbl === 'Listed';
+                const getStatusBadge = (value) => {
+                    return value === 'Listed' 
+                        ? '<span class="px-3 py-1 rounded-lg text-white text-xs font-bold bg-red-500">Listed</span>'
+                        : '<span class="px-3 py-1 rounded-lg text-white text-xs font-bold bg-green-500">Clean</span>';
+                };
                 
                 tr.innerHTML = `
-                    <td class="px-4 py-3">${row.serveur} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-gray-700" onclick="copyToClipboard('${row.serveur}')"></i></td>
-                    <td class="px-4 py-3">${row.ip} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-gray-700" onclick="copyToClipboard('${row.ip}')"></i></td>
-                    <td class="px-4 py-3">${row.domain} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-gray-700" onclick="copyToClipboard('${row.domain}')"></i></td>
-                    <td class="px-4 py-3 font-semibold">${row.status}</td>
-                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.css === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.css}</span></td>
-                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.pbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.pbl}</span></td>
-                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.xbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.xbl}</span></td>
-                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.sbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.sbl}</span></td>
-                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.barracuda === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.barracuda}</span></td>
-                    <td class="px-4 py-3 text-center"><span class="px-3 py-1 rounded text-white text-xs font-bold ${row.dbl === 'Listed' ? 'bg-red-500' : 'bg-green-500'}">${row.dbl}</span></td>
+                    <td class="px-4 py-3 font-medium text-gray-900">${row.serveur} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-purple-600 ml-2" onclick="copyToClipboard('${row.serveur}', event)"></i></td>
+                    <td class="px-4 py-3 font-medium text-gray-900">${row.ip} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-purple-600 ml-2" onclick="copyToClipboard('${row.ip}', event)"></i></td>
+                    <td class="px-4 py-3 font-medium text-gray-900">${row.domain} <i class="fas fa-copy cursor-pointer text-gray-400 hover:text-purple-600 ml-2" onclick="copyToClipboard('${row.domain}', event)"></i></td>
+                    <td class="px-4 py-3 text-center"><span class="inline-block px-3 py-1 rounded-lg text-xs font-bold bg-blue-100 text-blue-800">${row.status}</span></td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(row.css)}</td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(row.pbl)}</td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(row.xbl)}</td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(row.sbl)}</td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(row.barracuda)}</td>
+                    <td class="px-4 py-3 text-center">${getStatusBadge(row.dbl)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -324,11 +420,12 @@
         }
 
         function updateStatistics(results) {
-            const stats = { css: 0, pbl: 0, xbl: 0, dbl: 0, barracuda: 0 };
+            const stats = { css: 0, pbl: 0, xbl: 0, sbl: 0, dbl: 0, barracuda: 0 };
             results.forEach(r => {
                 if (r.css === 'Listed') stats.css++;
                 if (r.pbl === 'Listed') stats.pbl++;
                 if (r.xbl === 'Listed') stats.xbl++;
+                if (r.sbl === 'Listed') stats.sbl++;
                 if (r.dbl === 'Listed') stats.dbl++;
                 if (r.barracuda === 'Listed') stats.barracuda++;
             });
@@ -340,9 +437,15 @@
             document.getElementById('stats-section').classList.remove('hidden');
         }
 
-        function copyToClipboard(text) {
+        function copyToClipboard(text, event) {
+            event.stopPropagation();
             navigator.clipboard.writeText(text).then(() => {
-                alert('Copied: ' + text);
+                const icon = event.target;
+                const originalClass = icon.className;
+                icon.className = icon.className.replace('text-gray-400 hover:text-purple-600', 'text-green-500');
+                setTimeout(() => {
+                    icon.className = originalClass;
+                }, 1500);
             });
         }
 
@@ -354,20 +457,28 @@
                 .join('\n');
             
             if (!cleanIPs) {
-                alert('No clean IPs found');
+                showError('No clean IPs found');
                 return;
             }
             
             navigator.clipboard.writeText(cleanIPs).then(() => {
-                alert('Clean IPs copied to clipboard!');
+                const btn = document.getElementById('copy-clean-btn');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i><span>Copied!</span>';
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                }, 2000);
             });
         }
 
         function exportCSV() {
             const filtered = allResults.filter(r => {
-                if (currentFilter === 'all') return true;
-                const isListed = r.css === 'Listed' || r.pbl === 'Listed' || r.xbl === 'Listed' || r.sbl === 'Listed' || r.barracuda === 'Listed' || r.dbl === 'Listed';
-                return currentFilter === 'listed' ? isListed : !isListed;
+                for (let col in columnFilters) {
+                    if (columnFilters[col] && r[col] !== columnFilters[col]) {
+                        return false;
+                    }
+                }
+                return true;
             });
 
             let csv = 'Serveur,IP,Domain,Status,CSS,PBL,XBL,SBL,Barracuda,DBL\n';
@@ -375,15 +486,29 @@
                 csv += `"${r.serveur}","${r.ip}","${r.domain}","${r.status}","${r.css}","${r.pbl}","${r.xbl}","${r.sbl}","${r.barracuda}","${r.dbl}"\n`;
             });
 
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'blacklist_results_' + new Date().toISOString().split('T')[0] + '.csv';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'blacklist_results_' + new Date().toISOString().split('T')[0] + '.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function showError(message) {
+            const errDiv = document.getElementById('errors-section');
+            const errList = document.getElementById('errors-list');
+            errList.innerHTML = `<li>${message}</li>`;
+            errDiv.classList.remove('hidden');
+        }
+
+        function showErrors(errors) {
+            const errDiv = document.getElementById('errors-section');
+            const errList = document.getElementById('errors-list');
+            errList.innerHTML = errors.map(e => `<li>${e}</li>`).join('');
+            errDiv.classList.remove('hidden');
         }
     </script>
 </body>

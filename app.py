@@ -34,6 +34,12 @@ login_manager.login_view = 'login'  # type: ignore
 login_manager.login_message = 'Please log in to access your emails.'
 login_manager.login_message_category = 'info'
 
+# DNS Resolver Configuration
+resolver = dns.resolver.Resolver()
+resolver.timeout = 5
+resolver.lifetime = 10
+resolver.nameservers = ['8.8.8.8', '1.1.1.1']
+
 # User class for Flask-Login
 class User(UserMixin):
     def __init__(self, username, entity, name=None, has_toggle_permission=False, has_news_permission=False, has_domain_checker_permission=False, has_find_news_permission=False, has_extract_emails_permission=False, has_tssw_report_permission=False, has_gmass_permission=False, has_blacklist_lookup_permission=False):
@@ -2424,14 +2430,23 @@ def check_blacklists_api():
             return jsonify({'error': 'No data provided'}), 400
         
         results = []
+        errors = []
         
-        for line in lines:
+        for idx, line in enumerate(lines):
             line = line.strip()
-            if not line or ':' not in line:
+            
+            # Skip empty lines
+            if not line:
+                continue
+            
+            # Check format
+            if ':' not in line:
+                errors.append(f"Line {idx + 1}: Missing ':' separator - format must be SERVEUR:IP:DOMAIN:STATUS")
                 continue
             
             parts = line.split(':')
-            if len(parts) < 4:
+            if len(parts) != 4:
+                errors.append(f"Line {idx + 1}: Invalid format - expected 4 fields (SERVEUR:IP:DOMAIN:STATUS), got {len(parts)}")
                 continue
             
             serveur = parts[0].strip()
@@ -2440,11 +2455,29 @@ def check_blacklists_api():
             status = parts[3].strip()
             
             # Validate IP format
+            valid_ip = True
             try:
                 octets = ip.split('.')
-                if len(octets) != 4 or not all(0 <= int(o) <= 255 for o in octets):
-                    continue
-            except:
+                if len(octets) != 4:
+                    errors.append(f"Line {idx + 1}: Invalid IP address '{ip}' - must have 4 octets")
+                    valid_ip = False
+                else:
+                    for octet in octets:
+                        val = int(octet)
+                        if val < 0 or val > 255:
+                            errors.append(f"Line {idx + 1}: Invalid IP address '{ip}' - octet '{octet}' out of range (0-255)")
+                            valid_ip = False
+                            break
+            except ValueError:
+                errors.append(f"Line {idx + 1}: Invalid IP address '{ip}' - contains non-numeric values")
+                valid_ip = False
+            
+            if not valid_ip:
+                continue
+            
+            # Validate domain format (basic check)
+            if '.' not in domain or len(domain) < 3:
+                errors.append(f"Line {idx + 1}: Invalid domain '{domain}' - must contain at least one dot")
                 continue
             
             # Check IP blocklists
@@ -2470,11 +2503,15 @@ def check_blacklists_api():
             
             results.append(result_row)
         
-        return jsonify({'results': results})
+        response = {'results': results}
+        if errors:
+            response['errors'] = errors
+        
+        return jsonify(response)
     
     except Exception as e:
         logging.error(f"Error in check_blacklists_api: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
