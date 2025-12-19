@@ -106,6 +106,17 @@ Visual identification in Gmail account dropdown menu:
 
 ## Recent Changes (December 2025)
 
+### Blacklist Lookup Service Optimization (December 19, 2025)
+- ✅ Blacklist Lookup: Implemented parallel processing with ThreadPoolExecutor (30 concurrent workers)
+- ✅ Blacklist Lookup: Added SSE streaming for real-time progress display (X/Y format with animated progress bar)
+- ✅ Blacklist Lookup: Moved DQS_KEY to environment variable for security
+- ✅ Blacklist Lookup: Complete UI redesign with modern glassmorphism design (purple/blue gradients)
+- ✅ Blacklist Lookup: Added pagination with 16 items per page, prev/next buttons and page numbers
+- ✅ Blacklist Lookup: Added search bar for filtering by server name, IP, or domain
+- ✅ Blacklist Lookup: Moved Copy Clean IPs and Export CSV buttons to top toolbar
+- ✅ Blacklist Lookup: Added column filters for all blacklist types (CSS, PBL, XBL, SBL, Barracuda, DBL)
+- ✅ Blacklist Lookup: Responsive table with horizontal scrolling and clear button
+
 ### Domain Checker Enhancements and TSSW Rapport (December 13, 2025)
 - ✅ Domain Checker: Added SPF A Records subdomain validation (requires 1 line for all domains OR exact count matching domains)
 - ✅ Domain Checker: Created unified Domain Lookup tab merging MX/TXT tabs with checkboxes for MX, TXT, SPF, A Records
