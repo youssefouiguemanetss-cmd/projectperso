@@ -93,7 +93,12 @@
     - Added SBL card to stats section with green color (stat-sbl)
     - Updated Status filter options: changed from (ACTIVE, PAUSED, PROD) to (ALL, PAUSED, PRODUCTION)
     - Added copy icons to Serveur, IP, Domain column headers
-    - Added interactive copy functionality on hover - click to copy cell values to clipboard
-    - Added copyToClipboard() function with toast notifications for user feedback
     - Updated updateStatistics() to display SBL stats
-[x] 83. Application running successfully after blacklist_lookup updates - workflow status: RUNNING - no errors detected
+[x] 83. Updated copy functionality for Blacklist Lookup - Dec 20, 2025:
+    - Column headers (Serveur, IP, Domain) are now clickable
+    - Copy icons appear on header hover (opacity transition)
+    - Clicking copy on column header copies ALL values from that column based on current filter
+    - copyColumnValues() function filters and copies entire column with newline separators
+    - Toast shows count of copied values (e.g., "Copied 25 IPs to clipboard!")
+    - Works with all active filters applied to the table
+[x] 84. Application running successfully after copy functionality updates - workflow status: RUNNING - no errors detected
