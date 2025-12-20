@@ -86,3 +86,6 @@
     - Column filters for all blacklist types (CSS, PBL, XBL, SBL, Barracuda, DBL)
     - Loading overlay with real-time progress indicator (X/Y with animated progress bar)
     - Responsive table with horizontal scrolling
+[x] 79. Environment migration - Dec 20, 2025 - reinstalled Python packages and reconfigured workflow with webview output
+[x] 80. Application running successfully on port 5000 - workflow status: RUNNING
+[x] 81. Import migration to Replit environment completed - Dec 20, 2025 - all items marked as done
