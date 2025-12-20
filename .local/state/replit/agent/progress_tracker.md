@@ -89,3 +89,11 @@
 [x] 79. Environment migration - Dec 20, 2025 - reinstalled Python packages and reconfigured workflow with webview output
 [x] 80. Application running successfully on port 5000 - workflow status: RUNNING
 [x] 81. Import migration to Replit environment completed - Dec 20, 2025 - all items marked as done
+[x] 82. Blacklist Lookup service updates - Dec 20, 2025:
+    - Added SBL card to stats section with green color (stat-sbl)
+    - Updated Status filter options: changed from (ACTIVE, PAUSED, PROD) to (ALL, PAUSED, PRODUCTION)
+    - Added copy icons to Serveur, IP, Domain column headers
+    - Added interactive copy functionality on hover - click to copy cell values to clipboard
+    - Added copyToClipboard() function with toast notifications for user feedback
+    - Updated updateStatistics() to display SBL stats
+[x] 83. Application running successfully after blacklist_lookup updates - workflow status: RUNNING - no errors detected

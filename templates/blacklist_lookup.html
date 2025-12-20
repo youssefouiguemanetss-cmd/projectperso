@@ -231,7 +231,7 @@
                 </div>
 
                 <div id="stats-section" class="hidden mb-6">
-                    <div class="grid grid-cols-3 md:grid-cols-6 gap-3">
+                    <div class="grid grid-cols-3 md:grid-cols-7 gap-3">
                         <div class="stat-card rounded-xl p-3 text-center">
                             <div class="text-2xl font-bold text-purple-600"><span id="stat-total">0</span></div>
                             <div class="text-xs font-semibold text-gray-600">Total</div>
@@ -247,6 +247,10 @@
                         <div class="stat-card rounded-xl p-3 text-center">
                             <div class="text-2xl font-bold text-yellow-600"><span id="stat-xbl">0</span></div>
                             <div class="text-xs font-semibold text-gray-600">XBL</div>
+                        </div>
+                        <div class="stat-card rounded-xl p-3 text-center">
+                            <div class="text-2xl font-bold text-green-600"><span id="stat-sbl">0</span></div>
+                            <div class="text-xs font-semibold text-gray-600">SBL</div>
                         </div>
                         <div class="stat-card rounded-xl p-3 text-center">
                             <div class="text-2xl font-bold text-pink-500"><span id="stat-barracuda">0</span></div>
@@ -295,10 +299,9 @@
                             <option value="not Listed">DBL: Clean</option>
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="status">
-                            <option value="">Status: All</option>
-                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="">ALL</option>
                             <option value="PAUSED">PAUSED</option>
-                            <option value="PROD">PROD</option>
+                            <option value="PRODUCTION">PRODUCTION</option>
                         </select>
                         <button id="reset-filters-btn" class="text-sm text-purple-600 hover:text-purple-800 font-semibold">
                             <i class="fas fa-undo mr-1"></i>Reset
@@ -333,9 +336,9 @@
                         <table class="w-full text-sm">
                             <thead class="bg-gradient-to-r from-gray-800 to-gray-700 text-white">
                                 <tr>
-                                    <th class="px-4 py-3 text-left font-semibold">Serveur</th>
-                                    <th class="px-4 py-3 text-left font-semibold">IP</th>
-                                    <th class="px-4 py-3 text-left font-semibold">Domain</th>
+                                    <th class="px-4 py-3 text-left font-semibold"><i class="fas fa-copy text-xs mr-2"></i>Serveur</th>
+                                    <th class="px-4 py-3 text-left font-semibold"><i class="fas fa-copy text-xs mr-2"></i>IP</th>
+                                    <th class="px-4 py-3 text-left font-semibold"><i class="fas fa-copy text-xs mr-2"></i>Domain</th>
                                     <th class="px-4 py-3 text-center font-semibold">Status</th>
                                     <th class="px-4 py-3 text-center font-semibold">CSS</th>
                                     <th class="px-4 py-3 text-center font-semibold">PBL</th>
@@ -581,9 +584,24 @@
                 };
                 
                 tr.innerHTML = `
-                    <td class="px-4 py-3 font-medium text-gray-900">${escapeHtml(row.serveur)}</td>
-                    <td class="px-4 py-3 font-mono text-gray-700">${escapeHtml(row.ip)}</td>
-                    <td class="px-4 py-3 text-gray-700">${escapeHtml(row.domain)}</td>
+                    <td class="px-4 py-3 font-medium text-gray-900 cursor-pointer group relative" onclick="copyToClipboard('${escapeHtml(row.serveur)}', event)">
+                        <div class="flex items-center justify-between">
+                            <span>${escapeHtml(row.serveur)}</span>
+                            <i class="fas fa-copy text-xs text-gray-400 group-hover:text-purple-600 ml-2 opacity-0 group-hover:opacity-100 transition-all"></i>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 font-mono text-gray-700 cursor-pointer group relative" onclick="copyToClipboard('${escapeHtml(row.ip)}', event)">
+                        <div class="flex items-center justify-between">
+                            <span>${escapeHtml(row.ip)}</span>
+                            <i class="fas fa-copy text-xs text-gray-400 group-hover:text-purple-600 ml-2 opacity-0 group-hover:opacity-100 transition-all"></i>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-gray-700 cursor-pointer group relative" onclick="copyToClipboard('${escapeHtml(row.domain)}', event)">
+                        <div class="flex items-center justify-between">
+                            <span>${escapeHtml(row.domain)}</span>
+                            <i class="fas fa-copy text-xs text-gray-400 group-hover:text-purple-600 ml-2 opacity-0 group-hover:opacity-100 transition-all"></i>
+                        </div>
+                    </td>
                     <td class="px-4 py-3 text-center"><span class="inline-block px-2 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-800">${escapeHtml(row.status)}</span></td>
                     <td class="px-4 py-3 text-center">${getBadge(row.css)}</td>
                     <td class="px-4 py-3 text-center">${getBadge(row.pbl)}</td>
@@ -673,6 +691,7 @@
             document.getElementById('stat-css').textContent = stats.css;
             document.getElementById('stat-pbl').textContent = stats.pbl;
             document.getElementById('stat-xbl').textContent = stats.xbl;
+            document.getElementById('stat-sbl').textContent = stats.sbl;
             document.getElementById('stat-dbl').textContent = stats.dbl;
             document.getElementById('stat-barracuda').textContent = stats.barracuda;
         }
@@ -681,6 +700,15 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function copyToClipboard(text, event) {
+            event.stopPropagation();
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(`Copied: ${text}`);
+            }).catch(() => {
+                showToast('Failed to copy', 'error');
+            });
         }
 
         function copyCleanIPs() {
