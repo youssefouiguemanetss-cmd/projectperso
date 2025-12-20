@@ -2371,8 +2371,9 @@ def blacklist_lookup():
         return redirect(url_for('services'))
     return render_template('blacklist_lookup.html')
 
-# Spamhaus DQS Key from environment
-DQS_KEY = os.environ.get("DQS_KEY", "")
+# Spamhaus DQS Key from environment (with fallback like ipchecker.py)
+DQS_KEY = os.environ.get("DQS_KEY", "f3jqdoqpeyipweiizk7onufnlm")
+print(f"[BLACKLIST] DQS_KEY loaded: {DQS_KEY[:8]}... (length: {len(DQS_KEY)})")
 
 # Regex patterns for validation (same as ipchecker.py)
 import re
@@ -2384,8 +2385,10 @@ def check_spamhaus_ip(ip):
     try:
         rev = ".".join(ip.split(".")[::-1])
         query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
+        print(f"[DEBUG] Querying: {query}")
         answers = blacklist_resolver.resolve(query, "A")
         found = {r.to_text() for r in answers}
+        print(f"[DEBUG] IP {ip} -> Answers: {found}")
 
         if "127.0.0.3" in found:
             return "css"
@@ -2399,8 +2402,10 @@ def check_spamhaus_ip(ip):
             return "sbl"
         return None
     except dns.resolver.NXDOMAIN:
+        print(f"[DEBUG] IP {ip} -> NXDOMAIN (clean)")
         return "clean"
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] IP {ip} -> Exception: {e}")
         return None
 
 def check_barracuda(ip):
