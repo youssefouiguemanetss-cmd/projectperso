@@ -688,6 +688,7 @@
     </div>
 
     <script>
+    {% raw %}
         document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('userMenuButton');
     const dropdown = document.getElementById('userDropdown');
@@ -1022,287 +1023,287 @@ function TraiteWebsite(domaine) {
                 code: `// BacklinksTraffic Function that Used Backlinks Given for each domain and then search for our main domain
 
 function BacklinksTraffic(websitee) {
-	
-	var dm=websitee.domain;
-	var domain = websitee.domain;
-	var profiledomain = domain.replace("https://www.", "").replace("http://www.", "");
-	domain = domain.replace("https://www.", "").replace("http://www.", "").replace(".com", "").replace(".net", "");
-	var liness = 1;
-	var Conter=0;
-	var broken_link=0;
-	var backlinkslist = [];
-	var backlinkslistRandom = [];
-	while (true) {
-		macro = "CODE:";
-		macro += "SET !DATASOURCE "+domain+".txt\\n"
-		macro += "SET !DATASOURCE_COLUMNS 1\\n";
-		macro += "SET !DATASOURCE_LINE " + liness + "\\n";
-		macro += "SET !VAR1 {{!COL1}}\\n";
-		macro += "ADD !EXTRACT {{!VAR1}}\\n";
-		
-		var ret = iimPlay(macro);
-		if (ret < 0) {
-			break;
-		}
-		var r1=getRandomIntInclusive(60,70);
-		var r2=getRandomIntInclusive(80,100);
-		var r3=getRandomIntInclusive(100,120);
-		var r4=getRandomIntInclusive(120,150);
-		var r5=getRandomIntInclusive(120,130);
-		var backlink = iimGetLastExtract(1);
-		if (!backlink) break;
-		backlinkslist.push(backlink.trim());
-		liness++;
-	}
-	
-	if (backlinkslist.length <= numbrebacklinks) {
-		backlinkslistRandom = backlinkslist.slice();
-	} else {
-		var temp = backlinkslist.slice();
-		while (backlinkslistRandom.length < numbrebacklinks) {
-			var index = Math.floor(Math.random() * temp.length);
-			backlinkslistRandom.push(temp.splice(index, 1)[0]);
-		}
-	}
-	
-	for(r=0; r<backlinkslistRandom.length; r++){
-		
-		backlink=backlinkslistRandom[r];
-		var waiiit=getRandomIntInclusive(1,5);
-		iimPlayCode(\`
-			TAB OPEN
-			TAB T=2
-			TAB CLOSEALLOTHERS
-			URL GOTO=https://www.google.com/
-			WAIT SECONDS=\${waiiit}
-			TAG POS=1 TYPE=BUTTON ATTR=ID:L2AGLb';
-		\`);
-		
-		iimPlayCode(\`
-			WAIT SECONDS=2
-			URL GOTO=\${backlink}
-		\`);
-		
-		var aa1=getRandomIntInclusive(20,40);
-		var aa2=getRandomIntInclusive(5,10);
-		var aa3=getRandomIntInclusive(40,60);
-		iimPlayCode(\`
-			SET !TIMEOUT_STEP 1
-			SET !ERRORIGNORE YES
-			WAIT SECONDS=\${aa1}
-			URL GOTO=javascript:window.scrollTo(0,document.body.scrollHeight);
-			WAIT SECONDS=\${aa2}
-		\`);
-		
-		var resultt = iimPlayCode(\`
-			TAG POS=1 TYPE=A ATTR=HREF:*\${\domain}* CONTENT=EVENT:MOUSEOVER
-			WAIT SECONDS=1
-			TAG POS=1 TYPE=A ATTR=HREF:*\${\domain}*
-		\`);
-		
-		if (resultt > 0){
-			
-			var foundOups = false;
-			for (let tt = 1; tt <= 3; tt++) {
-				iimPlayCode(\`
-					SET !ERRORIGNORE YES
-					SET !TIMEOUT_STEP 1
-					TAG POS=\${tt} TYPE=DIV ATTR=CLASS:error-container EXTRACT=HTM
-				\`);
-				let html = iimGetLastExtract();
-				if (html !== "#EANF#" && html.toLowerCase().includes("oups")) {
-					foundOups = true;
-					break;
-				}
-			}
-			
-			if (foundOups) {
-				var rec = 1;
-				var macro;
-				var t = 1;
-				var brokenfolderNames = [];
-				while (true) {
-					var macro = "CODE:";
-					macro += "SET !DATASOURCE backlinksbroken.csv\\n";
-					macro += "SET !DATASOURCE_COLUMNS 1\\n";
-					macro += "SET !DATASOURCE_LINE " + t + "\\n";
-					macro += "ADD !EXTRACT {{!COL1}}\\n";
-					var rett = iimPlay(macro);
-					if (rett < 0) break;
-					var brokenfolder = iimGetLastExtract(1);
-					if (!brokenfolder) break;
-					brokenfolderNames.push(brokenfolder.trim());
-					t++;
-				}
-				iimPlayCode(\`
-					SET !EXTRACT {{!URLCURRENT}}
-				\`);
-				var chekbacklinks = iimGetLastExtract(1);
-				
-				if(brokenfolderNames.length > 0){
-					if (!brokenfolderNames.includes(chekbacklinks)) {
-						var writeMacro = \`
-							SET !EXTRACT {{!URLCURRENT}}
-							SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE=backlinksbroken.csv
-						\`;
-						iimPlayCode(writeMacro);
-						contentrep=websitee.ent+" | "+chekbacklinks;
-						iimSet("REP", contentrep);
-						iimSet("FILENAMEE", "brokenlinksent.txt");
-						var reportfileMacroo = \`
-							SET !EXTRACT {{REP}}
-							SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE={{FILENAMEE}}
-						\`;
-						iimPlayCode(reportfileMacroo);
-					}
-				} else {
-					var writeMacro = \`
-						SET !EXTRACT {{!URLCURRENT}}
-						SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE=backlinksbroken.csv
-					\`;
-					iimPlayCode(writeMacro);
-					contentrep=websitee.ent+" | "+chekbacklinks;
-					iimSet("REP", contentrep);
-					iimSet("FILENAMEE", "brokenlinksent.txt");
-					var reportfileMacroo = \`
-						SET !EXTRACT {{REP}}
-						SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE={{FILENAMEE}}
-					\`;
-					iimPlayCode(reportfileMacroo);
-				}
-				broken_link++;
-			} else {
-				var startTime = Date.now();
-				const hrefsection = getRandomIntInclusive(4, 6);
-				iimPlayCode(\`
-					WAIT SECONDS=10
-					TAG POS=1 TYPE=A ATTR=ID:cookieChoiceDismiss
-				\`);
-				var b=1;
-				var cc = getRandomIntInclusive(2, 10);
-				while(b <= cc){
-					var hrefposition = getRandomIntInclusive(1, 12);
-					const randomInt2 = getRandomIntInclusive(10, 15);
-					iimPlayCode(\`
-						SET !TIMEOUT_STEP 1
-						SET !ERRORIGNORE YES
-						TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#* CONTENT=EVENT:MOUSEOVER
-						WAIT SECONDS=1
-						TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#*
-						WAIT SECONDS=\${randomInt2}
-					\`);
-					b++;
-				}
-				iimPlayCode(\`
-					URL GOTO=javascript:window.scrollTo(0,document.body.scrollHeight);
-					WAIT SECONDS=18
-				\`);
-				const checkpricavy = getRandomIntInclusive(1, 5);
-				if(checkpricavy == 3){
-					iimPlayCode(\`
-						SET !TIMEOUT_STEP 1
-						SET !ERRORIGNORE YES
-						TAG POS=1 TYPE=A ATTR=TXT:*Privacy*
-						WAIT SECONDS=20
-						URL GOTO=javascript:window.scrollTo(0,document.body.scrollHeight);
-						WAIT SECONDS=10
-					\`);
-				}
-				b=1;
-				cc = getRandomIntInclusive(2, 10);
-				while(b <= cc){
-					var hrefposition = getRandomIntInclusive(1, 6);
-					const randomInt2 = getRandomIntInclusive(10, 15);
-					iimPlayCode(\`
-						SET !TIMEOUT_STEP 1
-						SET !ERRORIGNORE YES
-						TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#* CONTENT=EVENT:MOUSEOVER
-						WAIT SECONDS=1
-						TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#*
-						WAIT SECONDS=\${randomInt2}
-					\`);
-					b++;
-				}
-				var currenttUrl = window.content.location.href;
-				currenttUrl = currenttUrl.replace("https://www.", "").replace("http://www.", "").replace(".com", "").replace(".net", "");
-				var currenttUrls = currenttUrl.split("/");
-				dm = dm.replace("https://www.", "").replace(".com", "").replace(".net", "");
-				iimPlayCode(\`
-					WAIT SECONDS=2
-				\`);
-				iimPlayCode(\`
-					VERSION BUILD=9030808 RECORDER=FX
-					TAB T=1
-					URL GOTO=https://api.ipify.org?format=text
-					TAG POS=1 TYPE=BODY ATTR=* EXTRACT=TXT
-				\`);
-				var proxy = iimGetLastExtract(1);
-				var endTime = Date.now();
-				var elapsedSec = ((endTime - startTime) / 1000 / 60).toFixed(2);
-				var today = new Date();
-				var yyyy = today.getFullYear();
-				var mm = String(today.getMonth() + 1).padStart(2, '0');
-				var dd = String(today.getDate()).padStart(2, '0');
-				var formattedDate = yyyy + '/' + mm + '/' + dd;
-				var now = new Date();
-				var hours = now.getHours();
-				var minutes = now.getMinutes();
-				var ampm = hours >= 12 ? 'PM' : 'AM';
-				hours = hours % 12;
-				hours = hours ? hours : 12;
-				minutes = String(minutes).padStart(2, '0');
-				var timeString = hours + ':' + minutes + ' ' + ampm;
-				if(currenttUrls[0] == dm){
-					contentrep = "Script Backlinks Domain ; " + formattedDate + " ; " + timeString + " ; " + elapsedSec + " Minutes ; " + proxy + " ; " + websitee.ent + " ; Profile N° " + iniprofile + "; ID of Script: " + Conterr;
-					iimSet("REP", contentrep);
-					iimSet("FILENAME", domain + ".txt");
-					var reportfileMacro = \`
-						SET !EXTRACT {{REP}}
-						SAVEAS TYPE=EXTRACT FOLDER=\${reportPath} FILE={{FILENAME}}
-					\`;
-					iimPlayCode(reportfileMacro);
-					iimPlayCode(\`
-						WAIT SECONDS=3
-					\`);
-					contentpro = "Script Backlinks Domain ; " + profiledomain + " ; " + formattedDate + " ; " + timeString + " ; " + proxy + "; ID of Script: " + Conterr;
-					iimSet("REPP", contentpro);
-					iimSet("PROFILENAME", iniprofile + ".txt");
-					var reportprofileMacro = \`
-						SET !EXTRACT {{REPP}}
-						SAVEAS TYPE=EXTRACT FOLDER=\${reportPathProfiles} FILE={{PROFILENAME}}
-					\`;
-					iimPlayCode(reportprofileMacro);
-					iimPlayCode(\`
-						WAIT SECONDS=3
-					\`);
-					trafficrepo = profiledomain + " ; Profile N°" + iniprofile + " ; " + proxy + " ; " + formattedDate + "; ID of Script: " + Conterr;
-					iimSet("SCRIP", trafficrepo);
-					iimSet("SCRIPTNAME", "Domain_backlink_search.txt");
-					var reportscriptMacro = \`
-						SET !EXTRACT {{SCRIP}}
-						SAVEAS TYPE=EXTRACT FOLDER=\${reportPathScript} FILE={{SCRIPTNAME}}
-					\`;
-					iimPlayCode(reportscriptMacro);
-					iimPlayCode(\`
-						WAIT SECONDS=3
-					\`);
-					var messsage = profiledomain + " ; Script Backlinks Domain" + " ; Profile N° " + iniprofile + " ; " + proxy + " ; ID of Script: " + Conterr;
-					iimSet("MESSAGE", messsage);
-					iimSet("BATCONTER", Conterr + ".txt");
-					var RecordBatSession = \`
-						SET !EXTRACT {{MESSAGE}}
-						SAVEAS TYPE=EXTRACT FOLDER=\${BatNowPath} FILE={{BATCONTER}}
-					\`;
-					iimPlayCode(RecordBatSession);
-				}
-				iimPlayCode(\`
-					TAB OPEN
-					TAB T=2
-					TAB CLOSEALLOTHERS
-				\`);
-			}
-		}
-	}
+        
+        var dm=websitee.domain;
+        var domain = websitee.domain;
+        var profiledomain = domain.replace("https://www.", "").replace("http://www.", "");
+        domain = domain.replace("https://www.", "").replace("http://www.", "").replace(".com", "").replace(".net", "");
+        var liness = 1;
+        var Conter=0;
+        var broken_link=0;
+        var backlinkslist = [];
+        var backlinkslistRandom = [];
+        while (true) {
+                macro = "CODE:";
+                macro += "SET !DATASOURCE "+domain+".txt\\n"
+                macro += "SET !DATASOURCE_COLUMNS 1\\n";
+                macro += "SET !DATASOURCE_LINE " + liness + "\\n";
+                macro += "SET !VAR1 {{!COL1}}\\n";
+                macro += "ADD !EXTRACT {{!VAR1}}\\n";
+                
+                var ret = iimPlay(macro);
+                if (ret < 0) {
+                        break;
+                }
+                var r1=getRandomIntInclusive(60,70);
+                var r2=getRandomIntInclusive(80,100);
+                var r3=getRandomIntInclusive(100,120);
+                var r4=getRandomIntInclusive(120,150);
+                var r5=getRandomIntInclusive(120,130);
+                var backlink = iimGetLastExtract(1);
+                if (!backlink) break;
+                backlinkslist.push(backlink.trim());
+                liness++;
+        }
+        
+        if (backlinkslist.length <= numbrebacklinks) {
+                backlinkslistRandom = backlinkslist.slice();
+        } else {
+                var temp = backlinkslist.slice();
+                while (backlinkslistRandom.length < numbrebacklinks) {
+                        var index = Math.floor(Math.random() * temp.length);
+                        backlinkslistRandom.push(temp.splice(index, 1)[0]);
+                }
+        }
+        
+        for(r=0; r<backlinkslistRandom.length; r++){
+                
+                backlink=backlinkslistRandom[r];
+                var waiiit=getRandomIntInclusive(1,5);
+                iimPlayCode(\`
+                        TAB OPEN
+                        TAB T=2
+                        TAB CLOSEALLOTHERS
+                        URL GOTO=https://www.google.com/
+                        WAIT SECONDS=\${waiiit}
+                        TAG POS=1 TYPE=BUTTON ATTR=ID:L2AGLb';
+                \`);
+                
+                iimPlayCode(\`
+                        WAIT SECONDS=2
+                        URL GOTO=\${backlink}
+                \`);
+                
+                var aa1=getRandomIntInclusive(20,40);
+                var aa2=getRandomIntInclusive(5,10);
+                var aa3=getRandomIntInclusive(40,60);
+                iimPlayCode(\`
+                        SET !TIMEOUT_STEP 1
+                        SET !ERRORIGNORE YES
+                        WAIT SECONDS=\${aa1}
+                        URL GOTO=javascript:window.scrollTo(0,document.body.scrollHeight);
+                        WAIT SECONDS=\${aa2}
+                \`);
+                
+                var resultt = iimPlayCode(\`
+                        TAG POS=1 TYPE=A ATTR=HREF:*\${\domain}* CONTENT=EVENT:MOUSEOVER
+                        WAIT SECONDS=1
+                        TAG POS=1 TYPE=A ATTR=HREF:*\${\domain}*
+                \`);
+                
+                if (resultt > 0){
+                        
+                        var foundOups = false;
+                        for (let tt = 1; tt <= 3; tt++) {
+                                iimPlayCode(\`
+                                        SET !ERRORIGNORE YES
+                                        SET !TIMEOUT_STEP 1
+                                        TAG POS=\${tt} TYPE=DIV ATTR=CLASS:error-container EXTRACT=HTM
+                                \`);
+                                let html = iimGetLastExtract();
+                                if (html !== "#EANF#" && html.toLowerCase().includes("oups")) {
+                                        foundOups = true;
+                                        break;
+                                }
+                        }
+                        
+                        if (foundOups) {
+                                var rec = 1;
+                                var macro;
+                                var t = 1;
+                                var brokenfolderNames = [];
+                                while (true) {
+                                        var macro = "CODE:";
+                                        macro += "SET !DATASOURCE backlinksbroken.csv\\n";
+                                        macro += "SET !DATASOURCE_COLUMNS 1\\n";
+                                        macro += "SET !DATASOURCE_LINE " + t + "\\n";
+                                        macro += "ADD !EXTRACT {{!COL1}}\\n";
+                                        var rett = iimPlay(macro);
+                                        if (rett < 0) break;
+                                        var brokenfolder = iimGetLastExtract(1);
+                                        if (!brokenfolder) break;
+                                        brokenfolderNames.push(brokenfolder.trim());
+                                        t++;
+                                }
+                                iimPlayCode(\`
+                                        SET !EXTRACT {{!URLCURRENT}}
+                                \`);
+                                var chekbacklinks = iimGetLastExtract(1);
+                                
+                                if(brokenfolderNames.length > 0){
+                                        if (!brokenfolderNames.includes(chekbacklinks)) {
+                                                var writeMacro = \`
+                                                        SET !EXTRACT {{!URLCURRENT}}
+                                                        SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE=backlinksbroken.csv
+                                                \`;
+                                                iimPlayCode(writeMacro);
+                                                contentrep=websitee.ent+" | "+chekbacklinks;
+                                                iimSet("REP", contentrep);
+                                                iimSet("FILENAMEE", "brokenlinksent.txt");
+                                                var reportfileMacroo = \`
+                                                        SET !EXTRACT {{REP}}
+                                                        SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE={{FILENAMEE}}
+                                                \`;
+                                                iimPlayCode(reportfileMacroo);
+                                        }
+                                } else {
+                                        var writeMacro = \`
+                                                SET !EXTRACT {{!URLCURRENT}}
+                                                SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE=backlinksbroken.csv
+                                        \`;
+                                        iimPlayCode(writeMacro);
+                                        contentrep=websitee.ent+" | "+chekbacklinks;
+                                        iimSet("REP", contentrep);
+                                        iimSet("FILENAMEE", "brokenlinksent.txt");
+                                        var reportfileMacroo = \`
+                                                SET !EXTRACT {{REP}}
+                                                SAVEAS TYPE=EXTRACT FOLDER=\${basePath} FILE={{FILENAMEE}}
+                                        \`;
+                                        iimPlayCode(reportfileMacroo);
+                                }
+                                broken_link++;
+                        } else {
+                                var startTime = Date.now();
+                                const hrefsection = getRandomIntInclusive(4, 6);
+                                iimPlayCode(\`
+                                        WAIT SECONDS=10
+                                        TAG POS=1 TYPE=A ATTR=ID:cookieChoiceDismiss
+                                \`);
+                                var b=1;
+                                var cc = getRandomIntInclusive(2, 10);
+                                while(b <= cc){
+                                        var hrefposition = getRandomIntInclusive(1, 12);
+                                        const randomInt2 = getRandomIntInclusive(10, 15);
+                                        iimPlayCode(\`
+                                                SET !TIMEOUT_STEP 1
+                                                SET !ERRORIGNORE YES
+                                                TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#* CONTENT=EVENT:MOUSEOVER
+                                                WAIT SECONDS=1
+                                                TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#*
+                                                WAIT SECONDS=\${randomInt2}
+                                        \`);
+                                        b++;
+                                }
+                                iimPlayCode(\`
+                                        URL GOTO=javascript:window.scrollTo(0,document.body.scrollHeight);
+                                        WAIT SECONDS=18
+                                \`);
+                                const checkpricavy = getRandomIntInclusive(1, 5);
+                                if(checkpricavy == 3){
+                                        iimPlayCode(\`
+                                                SET !TIMEOUT_STEP 1
+                                                SET !ERRORIGNORE YES
+                                                TAG POS=1 TYPE=A ATTR=TXT:*Privacy*
+                                                WAIT SECONDS=20
+                                                URL GOTO=javascript:window.scrollTo(0,document.body.scrollHeight);
+                                                WAIT SECONDS=10
+                                        \`);
+                                }
+                                b=1;
+                                cc = getRandomIntInclusive(2, 10);
+                                while(b <= cc){
+                                        var hrefposition = getRandomIntInclusive(1, 6);
+                                        const randomInt2 = getRandomIntInclusive(10, 15);
+                                        iimPlayCode(\`
+                                                SET !TIMEOUT_STEP 1
+                                                SET !ERRORIGNORE YES
+                                                TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#* CONTENT=EVENT:MOUSEOVER
+                                                WAIT SECONDS=1
+                                                TAG POS=\${hrefposition} TYPE=A ATTR=HREF:*#*
+                                                WAIT SECONDS=\${randomInt2}
+                                        \`);
+                                        b++;
+                                }
+                                var currenttUrl = window.content.location.href;
+                                currenttUrl = currenttUrl.replace("https://www.", "").replace("http://www.", "").replace(".com", "").replace(".net", "");
+                                var currenttUrls = currenttUrl.split("/");
+                                dm = dm.replace("https://www.", "").replace(".com", "").replace(".net", "");
+                                iimPlayCode(\`
+                                        WAIT SECONDS=2
+                                \`);
+                                iimPlayCode(\`
+                                        VERSION BUILD=9030808 RECORDER=FX
+                                        TAB T=1
+                                        URL GOTO=https://api.ipify.org?format=text
+                                        TAG POS=1 TYPE=BODY ATTR=* EXTRACT=TXT
+                                \`);
+                                var proxy = iimGetLastExtract(1);
+                                var endTime = Date.now();
+                                var elapsedSec = ((endTime - startTime) / 1000 / 60).toFixed(2);
+                                var today = new Date();
+                                var yyyy = today.getFullYear();
+                                var mm = String(today.getMonth() + 1).padStart(2, '0');
+                                var dd = String(today.getDate()).padStart(2, '0');
+                                var formattedDate = yyyy + '/' + mm + '/' + dd;
+                                var now = new Date();
+                                var hours = now.getHours();
+                                var minutes = now.getMinutes();
+                                var ampm = hours >= 12 ? 'PM' : 'AM';
+                                hours = hours % 12;
+                                hours = hours ? hours : 12;
+                                minutes = String(minutes).padStart(2, '0');
+                                var timeString = hours + ':' + minutes + ' ' + ampm;
+                                if(currenttUrls[0] == dm){
+                                        contentrep = "Script Backlinks Domain ; " + formattedDate + " ; " + timeString + " ; " + elapsedSec + " Minutes ; " + proxy + " ; " + websitee.ent + " ; Profile N° " + iniprofile + "; ID of Script: " + Conterr;
+                                        iimSet("REP", contentrep);
+                                        iimSet("FILENAME", domain + ".txt");
+                                        var reportfileMacro = \`
+                                                SET !EXTRACT {{REP}}
+                                                SAVEAS TYPE=EXTRACT FOLDER=\${reportPath} FILE={{FILENAME}}
+                                        \`;
+                                        iimPlayCode(reportfileMacro);
+                                        iimPlayCode(\`
+                                                WAIT SECONDS=3
+                                        \`);
+                                        contentpro = "Script Backlinks Domain ; " + profiledomain + " ; " + formattedDate + " ; " + timeString + " ; " + proxy + "; ID of Script: " + Conterr;
+                                        iimSet("REPP", contentpro);
+                                        iimSet("PROFILENAME", iniprofile + ".txt");
+                                        var reportprofileMacro = \`
+                                                SET !EXTRACT {{REPP}}
+                                                SAVEAS TYPE=EXTRACT FOLDER=\${reportPathProfiles} FILE={{PROFILENAME}}
+                                        \`;
+                                        iimPlayCode(reportprofileMacro);
+                                        iimPlayCode(\`
+                                                WAIT SECONDS=3
+                                        \`);
+                                        trafficrepo = profiledomain + " ; Profile N°" + iniprofile + " ; " + proxy + " ; " + formattedDate + "; ID of Script: " + Conterr;
+                                        iimSet("SCRIP", trafficrepo);
+                                        iimSet("SCRIPTNAME", "Domain_backlink_search.txt");
+                                        var reportscriptMacro = \`
+                                                SET !EXTRACT {{SCRIP}}
+                                                SAVEAS TYPE=EXTRACT FOLDER=\${reportPathScript} FILE={{SCRIPTNAME}}
+                                        \`;
+                                        iimPlayCode(reportscriptMacro);
+                                        iimPlayCode(\`
+                                                WAIT SECONDS=3
+                                        \`);
+                                        var messsage = profiledomain + " ; Script Backlinks Domain" + " ; Profile N° " + iniprofile + " ; " + proxy + " ; ID of Script: " + Conterr;
+                                        iimSet("MESSAGE", messsage);
+                                        iimSet("BATCONTER", Conterr + ".txt");
+                                        var RecordBatSession = \`
+                                                SET !EXTRACT {{MESSAGE}}
+                                                SAVEAS TYPE=EXTRACT FOLDER=\${BatNowPath} FILE={{BATCONTER}}
+                                        \`;
+                                        iimPlayCode(RecordBatSession);
+                                }
+                                iimPlayCode(\`
+                                        TAB OPEN
+                                        TAB T=2
+                                        TAB CLOSEALLOTHERS
+                                \`);
+                        }
+                }
+        }
 }`
             },
             keyword: {
@@ -4478,7 +4479,7 @@ Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3; rv:050.102.231) Gecko/20100101 Fi
         // 4. Init Engagement Table
         renderEngagementTable();
 
-
+    {% endraw %}
     </script>
 </body>
 </html>
