@@ -102,3 +102,7 @@
     - Toast shows count of copied values (e.g., "Copied 25 IPs to clipboard!")
     - Works with all active filters applied to the table
 [x] 84. Application running successfully after copy functionality updates - workflow status: RUNNING - no errors detected
+[x] 85. Environment migration - Dec 21, 2025 - reinstalled Python packages and reconfigured workflow with webview output
+[x] 86. Verified application running successfully on port 5000 - workflow status: RUNNING
+[x] 87. Screenshot confirmed TSS Gmail Access login page displays correctly
+[x] 88. Import migration to Replit environment completed - all items marked as done
