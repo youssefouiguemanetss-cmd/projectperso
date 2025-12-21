@@ -2239,13 +2239,59 @@ def api_txt_stream():
     )
 
 @app.route('/tssw_rapport')
+@app.route('/tssw_rapport/')
 @login_required
-def tssw_rapport():
-    """TSSW Rapport service - only for users with tssw_report permission"""
+def tssw_rapport_index():
+    """TSSW Rapport service index - only for users with tssw_report permission"""
     if not current_user.has_tssw_report_permission:
         flash('You do not have permission to access this service.', 'error')
         return redirect(url_for('services'))
-    return render_template('tssw_rapport.html', current_user=current_user)
+    return render_template('tssw_rapport/index.html', current_user=current_user)
+
+@app.route('/tssw_rapport/domain')
+@login_required
+def tssw_rapport_domain():
+    """TSSW Rapport domain projects page"""
+    if not current_user.has_tssw_report_permission:
+        flash('You do not have permission to access this service.', 'error')
+        return redirect(url_for('services'))
+    return render_template('tssw_rapport/domain.html', current_user=current_user)
+
+@app.route('/tssw_rapport/offer')
+@login_required
+def tssw_rapport_offer():
+    """TSSW Rapport offers page"""
+    if not current_user.has_tssw_report_permission:
+        flash('You do not have permission to access this service.', 'error')
+        return redirect(url_for('services'))
+    return render_template('tssw_rapport/offer.html', current_user=current_user)
+
+@app.route('/tssw_rapport/warmup')
+@login_required
+def tssw_rapport_warmup():
+    """TSSW Rapport warmup page"""
+    if not current_user.has_tssw_report_permission:
+        flash('You do not have permission to access this service.', 'error')
+        return redirect(url_for('services'))
+    return render_template('tssw_rapport/warmup.html', current_user=current_user)
+
+@app.route('/tssw_rapport/app')
+@login_required
+def tssw_rapport_app():
+    """TSSW Rapport app development page"""
+    if not current_user.has_tssw_report_permission:
+        flash('You do not have permission to access this service.', 'error')
+        return redirect(url_for('services'))
+    return render_template('tssw_rapport/app_report.html', current_user=current_user)
+
+@app.route('/tssw_rapport/chromprocess')
+@login_required
+def tssw_rapport_chromprocess():
+    """TSSW Rapport Chrome extensions page"""
+    if not current_user.has_tssw_report_permission:
+        flash('You do not have permission to access this service.', 'error')
+        return redirect(url_for('services'))
+    return render_template('tssw_rapport/chromprocess.html', current_user=current_user)
 
 @app.route('/api/domain_checker/unified_lookup')
 @login_required
