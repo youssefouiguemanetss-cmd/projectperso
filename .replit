@@ -1,4 +1,4 @@
-modules = ["web", "python-3.11"]
+modules = ["nodejs-20", "web", "python-3.11"]
 run = "python app.py"
 
 [nix]
