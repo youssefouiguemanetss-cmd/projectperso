@@ -2421,16 +2421,61 @@ def blacklist_lookup():
 DQS_KEY = os.environ.get("DQS_KEY", "f3jqdoqpeyipweiizk7onufnlm")
 print(f"[BLACKLIST] DQS_KEY loaded: {DQS_KEY[:8]}... (length: {len(DQS_KEY)})")
 
-# Regex patterns for validation (same as ipchecker.py)
+# Regex patterns for validation
 import re
-IP_REGEX = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
+import ipaddress
 DOMAIN_REGEX = re.compile(r"^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$")
 
-def check_spamhaus_ip(ip):
-    """Check IP against Spamhaus blocklists - EXACT copy from ipchecker.py"""
+def is_ipv4(ip):
+    """Check if string is a valid IPv4 address using ipaddress module"""
     try:
-        rev = ".".join(ip.split(".")[::-1])
-        query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
+        addr = ipaddress.ip_address(ip)
+        return addr.version == 4
+    except ValueError:
+        return False
+
+def is_ipv6(ip):
+    """Check if string is a valid IPv6 address using ipaddress module (supports all formats including IPv4-mapped)"""
+    try:
+        addr = ipaddress.ip_address(ip)
+        return addr.version == 6
+    except ValueError:
+        return False
+
+def is_valid_ip(ip):
+    """Check if string is a valid IPv4 or IPv6 address using ipaddress module"""
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
+def expand_ipv6(ip):
+    """Expand an IPv6 address to full 32 hex characters format for DNS lookup"""
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(ip)
+        if addr.version == 6:
+            return addr.exploded.replace(':', '')
+        return None
+    except ValueError:
+        return None
+
+def check_spamhaus_ip(ip):
+    """Check IP against Spamhaus blocklists - supports both IPv4 and IPv6"""
+    try:
+        if is_ipv4(ip):
+            rev = ".".join(ip.split(".")[::-1])
+            query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
+        elif is_ipv6(ip):
+            expanded = expand_ipv6(ip)
+            if not expanded:
+                return None
+            rev = ".".join(reversed(expanded))
+            query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
+        else:
+            return None
+        
         print(f"[DEBUG] Querying: {query}")
         answers = blacklist_resolver.resolve(query, "A")
         found = {r.to_text() for r in answers}
@@ -2455,10 +2500,20 @@ def check_spamhaus_ip(ip):
         return None
 
 def check_barracuda(ip):
-    """Check IP against Barracuda blocklist - EXACT copy from ipchecker.py"""
+    """Check IP against Barracuda blocklist - supports both IPv4 and IPv6"""
     try:
-        rev = ".".join(ip.split(".")[::-1])
-        query = f"{rev}.b.barracudacentral.org"
+        if is_ipv4(ip):
+            rev = ".".join(ip.split(".")[::-1])
+            query = f"{rev}.b.barracudacentral.org"
+        elif is_ipv6(ip):
+            expanded = expand_ipv6(ip)
+            if not expanded:
+                return False
+            rev = ".".join(reversed(expanded))
+            query = f"{rev}.b.barracudacentral.org"
+        else:
+            return False
+        
         blacklist_resolver.resolve(query, "A")
         return True
     except dns.resolver.NXDOMAIN:
@@ -2543,8 +2598,8 @@ def check_blacklists_stream():
             if not line:
                 continue
             
-            # Split on colons - support multiple formats like ipchecker.py
-            parts = line.split(":")
+            # Split on semicolons - new format: SERVEUR;IP;DOMAIN;STATUS
+            parts = line.split(";")
             
             serveur = ""
             ip = ""
@@ -2552,22 +2607,22 @@ def check_blacklists_stream():
             status = ""
             
             if len(parts) == 4:
-                # Format: SERVEUR:IP:DOMAIN:STATUS
+                # Format: SERVEUR;IP;DOMAIN;STATUS
                 serveur = parts[0].strip()
                 ip = parts[1].strip()
                 domain = parts[2].strip()
                 status = parts[3].strip()
             elif len(parts) == 3:
-                # Format: SERVEUR:IP:DOMAIN
+                # Format: SERVEUR;IP;DOMAIN
                 serveur = parts[0].strip()
                 ip = parts[1].strip()
                 domain = parts[2].strip()
                 status = ""
             elif len(parts) == 2:
-                # Format: SERVEUR:VALUE (IP or Domain)
+                # Format: SERVEUR;VALUE (IP or Domain)
                 serveur = parts[0].strip()
                 value = parts[1].strip()
-                if IP_REGEX.match(value):
+                if is_valid_ip(value):
                     ip = value
                     domain = ""
                 elif DOMAIN_REGEX.match(value):
@@ -2579,7 +2634,7 @@ def check_blacklists_stream():
             elif len(parts) == 1:
                 # Format: Just IP or Domain
                 value = parts[0].strip()
-                if IP_REGEX.match(value):
+                if is_valid_ip(value):
                     serveur = "unknown"
                     ip = value
                     domain = ""
@@ -2591,12 +2646,12 @@ def check_blacklists_stream():
                     errors.append(f"Line {idx + 1}: Invalid format")
                     continue
             else:
-                errors.append(f"Line {idx + 1}: Too many colons in line")
+                errors.append(f"Line {idx + 1}: Too many semicolons in line")
                 continue
             
-            # Validate IP format if provided
+            # Validate IP format if provided (supports both IPv4 and IPv6)
             if ip:
-                if not IP_REGEX.match(ip):
+                if not is_valid_ip(ip):
                     errors.append(f"Line {idx + 1}: Invalid IP '{ip}'")
                     continue
             

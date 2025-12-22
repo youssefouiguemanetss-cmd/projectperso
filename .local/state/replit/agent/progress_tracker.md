@@ -111,3 +111,10 @@
 [x] 91. Verified application running successfully - workflow status: RUNNING, gunicorn listening on port 5000
 [x] 92. Screenshot confirmed TSS Gmail Access login page displays correctly
 [x] 93. Final import migration to Replit environment completed - all items marked as done
+[x] 94. Blacklist Lookup Updates - Dec 22, 2025:
+    - Fixed "Clean" filter option - changed values from "not Listed" to "Clean" to match actual data
+    - Fixed Status filter to be case-insensitive (PAUSED/paused, PRODUCTION/Production work equally)
+    - Changed input format separator from ":" (colon) to ";" (semicolon) for IPv6 compatibility
+    - New format: SERVEUR;IP;DOMAIN;STATUS (supports both IPv4 and IPv6 addresses)
+    - Added IPv6 regex validation and proper IPv6 blacklist lookups using expanded format
+    - Updated placeholder text and format instructions in the UI

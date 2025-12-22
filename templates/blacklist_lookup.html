@@ -191,7 +191,7 @@
             </div>
         </div>
     </header>
-	
+        
 
 
 
@@ -202,8 +202,8 @@
                     <label class="block text-sm font-bold text-gray-700 mb-2">
                         <i class="fas fa-file-alt mr-2 text-purple-600"></i> Enter Data
                     </label>
-                    <p class="text-sm text-gray-500 mb-3">Format: <code class="bg-purple-100 text-purple-700 px-2 py-1 rounded font-mono text-xs">SERVEUR:IP:DOMAIN:STATUS</code> (one per line)</p>
-                    <textarea id="blacklist-input" class="input-modern w-full h-32 px-4 py-3 rounded-xl resize-none font-mono text-sm" placeholder="SERVEUR1:192.168.1.1:example.com:Production&#10;SERVEUR2:10.0.0.1:domain.org:Paused"></textarea>
+                    <p class="text-sm text-gray-500 mb-3">Format: <code class="bg-purple-100 text-purple-700 px-2 py-1 rounded font-mono text-xs">SERVEUR;IP;DOMAIN;STATUS</code> (one per line, IP can be IPv4 or IPv6)</p>
+                    <textarea id="blacklist-input" class="input-modern w-full h-32 px-4 py-3 rounded-xl resize-none font-mono text-sm" placeholder="SERVEUR1;192.168.1.1;example.com;Production&#10;SERVEUR2;2a02:c207:2294:2913:0392:3d47:a0fe:ee30;domain.org;Paused"></textarea>
                     <div class="mt-2 flex items-center space-x-4">
                         <label class="text-purple-600 cursor-pointer hover:underline font-semibold text-sm flex items-center">
                             <i class="fas fa-upload mr-2"></i>
@@ -231,7 +231,7 @@
                         <i class="fas fa-trash-alt"></i>
                         <span>Clear</span>
                     </button>
-					<a
+                                        <a
     href="{{ url_for('static', filename='downloads/GetIps.rar') }}"
     download
     class="inline-flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-800 transition"
@@ -283,32 +283,32 @@
                         <select class="column-filter select-filter text-sm" data-column="css">
                             <option value="">CSS: All</option>
                             <option value="Listed">CSS: Listed</option>
-                            <option value="not Listed">CSS: Clean</option>
+                            <option value="Clean">CSS: Clean</option>
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="pbl">
                             <option value="">PBL: All</option>
                             <option value="Listed">PBL: Listed</option>
-                            <option value="not Listed">PBL: Clean</option>
+                            <option value="Clean">PBL: Clean</option>
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="xbl">
                             <option value="">XBL: All</option>
                             <option value="Listed">XBL: Listed</option>
-                            <option value="not Listed">XBL: Clean</option>
+                            <option value="Clean">XBL: Clean</option>
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="sbl">
                             <option value="">SBL: All</option>
                             <option value="Listed">SBL: Listed</option>
-                            <option value="not Listed">SBL: Clean</option>
+                            <option value="Clean">SBL: Clean</option>
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="barracuda">
                             <option value="">Barracuda: All</option>
                             <option value="Listed">Barracuda: Listed</option>
-                            <option value="not Listed">Barracuda: Clean</option>
+                            <option value="Clean">Barracuda: Clean</option>
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="dbl">
                             <option value="">DBL: All</option>
                             <option value="Listed">DBL: Listed</option>
-                            <option value="not Listed">DBL: Clean</option>
+                            <option value="Clean">DBL: Clean</option>
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="status">
                             <option value="">ALL</option>
@@ -570,12 +570,22 @@
         function applyFilters() {
             filteredResults = allResults.filter(r => {
                 for (let col in columnFilters) {
-                    if (columnFilters[col] && r[col] !== columnFilters[col]) {
-                        return false;
+                    if (columnFilters[col]) {
+                        if (col === 'status') {
+                            const rowStatus = (r[col] || '').toLowerCase();
+                            const filterStatus = columnFilters[col].toLowerCase();
+                            if (rowStatus !== filterStatus) {
+                                return false;
+                            }
+                        } else {
+                            if (r[col] !== columnFilters[col]) {
+                                return false;
+                            }
+                        }
                     }
                 }
                 if (searchQuery) {
-                    const searchStr = (r.serveur + ' ' + r.ip + ' ' + r.domain).toLowerCase();
+                    const searchStr = ((r.serveur || '') + ' ' + (r.ip || '') + ' ' + (r.domain || '')).toLowerCase();
                     if (!searchStr.includes(searchQuery)) {
                         return false;
                     }
@@ -862,9 +872,9 @@ function getStatusBadge(status) {
 
 
         updateLineCount();
-		
-		
-		
+                
+                
+                
     </script>
 </body>
 </html>
