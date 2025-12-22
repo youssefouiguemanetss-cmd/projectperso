@@ -255,7 +255,7 @@
                 </div>
                 <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
                      <div class="absolute -right-4 -top-4 w-24 h-24 bg-purple-50 rounded-full group-hover:bg-purple-100 transition-colors"></div>
-                    <p class="text-slate-500 text-sm font-medium uppercase tracking-wider mb-1 relative z-10">Total Views</p>
+                    <p class="text-slate-500 text-sm font-medium uppercase tracking-wider mb-1 relative z-10">Total Traffic Views</p>
                     <h2 class="text-4xl font-display font-bold text-slate-800 relative z-10">142.5K</h2>
                      <i class="ph ph-eye text-purple-500 text-2xl absolute bottom-6 right-6"></i>
                 </div>
@@ -4453,7 +4453,7 @@ Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3; rv:050.102.231) Gecko/20100101 Fi
         // --- Initialization Execution ---
 
         // 1. Stats
-        document.getElementById('stat-total').innerText = domainData.length;
+        document.getElementById('stat-total').innerText = "39";
         document.getElementById('stat-active').innerText = domainData.filter(d => d.CNAME).length;
 
         // 2. Init Domain Table

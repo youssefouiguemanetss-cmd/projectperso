@@ -191,6 +191,9 @@
             </div>
         </div>
     </header>
+	
+
+
 
     <div class="container mx-auto px-4 py-6 max-w-7xl">
         <div class="glass-card rounded-2xl shadow-xl overflow-hidden">
@@ -200,7 +203,7 @@
                         <i class="fas fa-file-alt mr-2 text-purple-600"></i> Enter Data
                     </label>
                     <p class="text-sm text-gray-500 mb-3">Format: <code class="bg-purple-100 text-purple-700 px-2 py-1 rounded font-mono text-xs">SERVEUR:IP:DOMAIN:STATUS</code> (one per line)</p>
-                    <textarea id="blacklist-input" class="input-modern w-full h-32 px-4 py-3 rounded-xl resize-none font-mono text-sm" placeholder="SERVEUR1:192.168.1.1:example.com:ACTIVE&#10;SERVEUR2:10.0.0.1:domain.org:INACTIVE"></textarea>
+                    <textarea id="blacklist-input" class="input-modern w-full h-32 px-4 py-3 rounded-xl resize-none font-mono text-sm" placeholder="SERVEUR1:192.168.1.1:example.com:Production&#10;SERVEUR2:10.0.0.1:domain.org:Paused"></textarea>
                     <div class="mt-2 flex items-center space-x-4">
                         <label class="text-purple-600 cursor-pointer hover:underline font-semibold text-sm flex items-center">
                             <i class="fas fa-upload mr-2"></i>
@@ -228,6 +231,15 @@
                         <i class="fas fa-trash-alt"></i>
                         <span>Clear</span>
                     </button>
+					<a
+    href="{{ url_for('static', filename='downloads/GetIps.rar') }}"
+    download
+    class="inline-flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-800 transition"
+>
+    <i class="fas fa-file-archive"></i>
+    Download Tool Package
+    <span class="text-xs text-gray-400">(WinRAR)</span>
+</a>
                 </div>
 
                 <div id="stats-section" class="hidden mb-6">
@@ -300,8 +312,8 @@
                         </select>
                         <select class="column-filter select-filter text-sm" data-column="status">
                             <option value="">ALL</option>
-                            <option value="PAUSED">PAUSED</option>
-                            <option value="PRODUCTION">PRODUCTION</option>
+                            <option value="Paused">Paused</option>
+                            <option value="Production">Production</option>
                         </select>
                         <button id="reset-filters-btn" class="text-sm text-purple-600 hover:text-purple-800 font-semibold">
                             <i class="fas fa-undo mr-1"></i>Reset
@@ -602,7 +614,9 @@
                     <td class="px-4 py-3 font-medium text-gray-900">${escapeHtml(row.serveur)}</td>
                     <td class="px-4 py-3 font-mono text-gray-700">${escapeHtml(row.ip)}</td>
                     <td class="px-4 py-3 text-gray-700">${escapeHtml(row.domain)}</td>
-                    <td class="px-4 py-3 text-center"><span class="inline-block px-2 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-800">${escapeHtml(row.status)}</span></td>
+                    <td class="px-4 py-3 text-center">
+    ${getStatusBadge(row.status)}
+</td>
                     <td class="px-4 py-3 text-center">${getBadge(row.css)}</td>
                     <td class="px-4 py-3 text-center">${getBadge(row.pbl)}</td>
                     <td class="px-4 py-3 text-center">${getBadge(row.xbl)}</td>
@@ -720,12 +734,30 @@
                 return;
             }
             
-            navigator.clipboard.writeText(values).then(() => {
-                const count = values.split('\n').length;
-                showToast(`Copied ${count} ${column}${count !== 1 ? 's' : ''} to clipboard!`);
-            }).catch(() => {
-                showToast('Failed to copy', 'error');
-            });
+            function copyTextFallback(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+}
+
+try {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(values);
+    } else {
+        copyTextFallback(values);
+    }
+
+    const count = values.split('\n').length;
+    showToast(`Copied ${count} ${column}${count !== 1 ? 's' : ''} to clipboard!`);
+} catch (e) {
+    showToast('Failed to copy', 'error');
+}
+
         }
 
         function copyCleanIPs() {
@@ -795,7 +827,44 @@
             }, 3000);
         }
 
+
+
+function getStatusBadge(status) {
+    if (!status) return '';
+
+    const s = status.toLowerCase();
+
+    if (s === 'production') {
+        return `
+            <span class="inline-block px-2 py-1 rounded-md text-xs font-bold bg-blue-100 text-blue-800">
+                Production
+            </span>
+        `;
+    }
+
+    if (s === 'paused') {
+        return `
+            <span class="inline-block px-2 py-1 rounded-md text-xs font-bold
+                         bg-orange-100 text-orange-800 border border-orange-200">
+                Paused
+            </span>
+        `;
+    }
+
+    // fallback (if other status appears)
+    return `
+        <span class="inline-block px-2 py-1 rounded-md text-xs font-bold
+                     bg-gray-100 text-gray-800 border border-gray-200">
+            ${escapeHtml(status)}
+        </span>
+    `;
+}
+
+
         updateLineCount();
+		
+		
+		
     </script>
 </body>
 </html>

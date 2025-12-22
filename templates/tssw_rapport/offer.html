@@ -146,7 +146,7 @@
 <nav class="nav-glass fixed w-full z-50 top-0 transition-all duration-300">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-20">
-            <a href="Domain.html" class="flex items-center gap-3 cursor-pointer group">
+            <a href="{{ url_for('tssw_rapport_domain') }}" class="flex items-center gap-3 cursor-pointer group">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white transition-transform group-hover:scale-105">
                     <i class="ph ph-chart-line-up text-xl"></i>
                 </div>
@@ -154,10 +154,10 @@
             </a>
             
             <div class="hidden md:flex items-center gap-6">
-                <a href="Domain.html" class="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors">
+                <a href="{{ url_for('tssw_rapport_domain') }}" class="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors">
                     <i class="ph ph-globe"></i> Domain Report
                 </a>
-                <a href="Warmup.html" class="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors">
+                <a href="{{ url_for('tssw_rapport_warmup') }}" class="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors">
                     <i class="ph ph-fire"></i> Warmup
                 </a>
                 <div class="h-6 w-px bg-slate-200 mx-2"></div>
