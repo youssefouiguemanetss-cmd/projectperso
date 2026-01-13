@@ -382,6 +382,17 @@
                     <div id="pagination-section" class="mt-4 flex items-center justify-between">
                         <div class="text-sm text-gray-600">
                             Showing <span id="showing-start">0</span>-<span id="showing-end">0</span> of <span id="showing-total">0</span> results
+							<!-- Add this new select here -->
+        <div class="flex items-center gap-2">
+            <label for="page-size" class="text-sm font-medium text-gray-700">Rows per page:</label>
+            <select id="page-size" class="select-filter text-sm border border-gray-300 rounded-lg px-3 py-1">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="all">All</option>
+            </select>
+        </div>
                         </div>
                         <div class="flex items-center gap-2">
                             <button id="prev-btn" class="pagination-btn px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium disabled:opacity-50">
@@ -427,7 +438,7 @@
         let columnFilters = {};
         let searchQuery = '';
         let currentPage = 1;
-        const itemsPerPage = 16;
+        let itemsPerPage = 10;
 
         document.getElementById('blacklist-file').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -466,6 +477,23 @@
         });
 
         document.getElementById('reset-filters-btn').addEventListener('click', resetFilters);
+		
+		
+		document.getElementById('page-size').addEventListener('change', function () {
+    const value = this.value;
+
+    if (value === 'all') {
+        itemsPerPage = filteredResults.length || allResults.length || 1;
+    } else {
+        itemsPerPage = parseInt(value);
+    }
+
+    currentPage = 1;
+    displayResults();
+});
+
+
+
         document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
         document.getElementById('copy-clean-btn').addEventListener('click', copyCleanIPs);
         document.getElementById('prev-btn').addEventListener('click', () => changePage(-1));

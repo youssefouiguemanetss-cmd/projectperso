@@ -2470,34 +2470,34 @@ def check_spamhaus_ip(ip):
         elif is_ipv6(ip):
             expanded = expand_ipv6(ip)
             if not expanded:
-                return None
+                return set()
             rev = ".".join(reversed(expanded))
             query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
         else:
-            return None
+            return set()
         
         print(f"[DEBUG] Querying: {query}")
         answers = blacklist_resolver.resolve(query, "A")
         found = {r.to_text() for r in answers}
         print(f"[DEBUG] IP {ip} -> Answers: {found}")
 
+        listings = set()
         if "127.0.0.3" in found:
-            return "css"
-        if "127.0.0.2" in found or "127.0.0.9" in found:
-            return "sbl"
+            listings.add("css")
+        if found.intersection({"127.0.0.2", "127.0.0.9"}):
+            listings.add("sbl")
         if found.intersection({"127.0.0.4", "127.0.0.5", "127.0.0.6", "127.0.0.7"}):
-            return "xbl"
-        if "127.0.0.10" in found or "127.0.0.11" in found:
-            return "pbl"
-        if any(r.startswith("127.0.0.") for r in found):
-            return "sbl"
-        return None
+            listings.add("xbl")
+        if found.intersection({"127.0.0.10", "127.0.0.11"}):
+            listings.add("pbl")
+        
+        return listings
     except dns.resolver.NXDOMAIN:
         print(f"[DEBUG] IP {ip} -> NXDOMAIN (clean)")
-        return "clean"
+        return set()
     except Exception as e:
         print(f"[DEBUG] IP {ip} -> Exception: {e}")
-        return None
+        return set()
 
 def check_barracuda(ip):
     """Check IP against Barracuda blocklist - supports both IPv4 and IPv6"""
@@ -2556,12 +2556,12 @@ def check_single_entry(entry_data):
     
     # Check IP blocklists only if IP is provided (same logic as ipchecker.py)
     if ip:
-        spamhaus_ip = check_spamhaus_ip(ip)
+        spamhaus_results = check_spamhaus_ip(ip)
         barracuda = check_barracuda(ip)
         
-        # Map spamhaus result to the correct column
-        if spamhaus_ip and spamhaus_ip != "clean":
-            result[spamhaus_ip] = 'Listed'
+        # Map spamhaus results to the correct columns (handles multiple)
+        for listing in spamhaus_results:
+            result[listing] = 'Listed'
         
         if barracuda:
             result['barracuda'] = 'Listed'
