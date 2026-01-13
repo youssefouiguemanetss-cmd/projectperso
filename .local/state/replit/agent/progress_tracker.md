@@ -118,3 +118,8 @@
     - New format: SERVEUR;IP;DOMAIN;STATUS (supports both IPv4 and IPv6 addresses)
     - Added IPv6 regex validation and proper IPv6 blacklist lookups using expanded format
     - Updated placeholder text and format instructions in the UI
+[x] 95. Environment migration - Jan 13, 2026 - reinstalled Python packages (gunicorn, flask, flask-login, flask-sqlalchemy, psycopg2-binary, email-validator)
+[x] 96. Reconfigured workflow with webview output type and port 5000 binding
+[x] 97. Verified application running successfully - workflow status: RUNNING, gunicorn listening on port 5000
+[x] 98. Screenshot confirmed TSS Gmail Access login page displays correctly
+[x] 99. Import migration to Replit environment completed - all items marked as done
