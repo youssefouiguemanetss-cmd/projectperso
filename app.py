@@ -63,6 +63,8 @@ class User(UserMixin):
         self.has_tssw_report_permission = has_tssw_report_permission
         self.has_gmass_permission = has_gmass_permission
         self.has_blacklist_lookup_permission = has_blacklist_lookup_permission
+        self.has_download_extension_permission = False
+        self.has_add_extensions_permission = False
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -81,7 +83,12 @@ def load_user(user_id):
         has_gmass = user_data['has_gmass_permission']
         has_blacklist_lookup = user_data['has_blacklist_lookup_permission']
         if username == user_id:
-            return User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report, has_gmass, has_blacklist_lookup)
+            user = User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report, has_gmass, has_blacklist_lookup)
+            # Add new extension permissions
+            permissions = user_data.get('permissions', [])
+            user.has_download_extension_permission = 'download_extension' in permissions
+            user.has_add_extensions_permission = 'add_extensions' in permissions
+            return user
     return None
 
 def load_users_from_file():
@@ -2716,3 +2723,83 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
 
 application = app
+# --- Useful Extensions Service ---
+def load_extensions():
+    try:
+        if os.path.exists('extensions.json'):
+            with open('extensions.json', 'r') as f:
+                content = f.read()
+                return json.loads(content) if content else []
+    except Exception as e:
+        logging.error(f"Error loading extensions: {e}")
+    return []
+
+def save_extensions(extensions):
+    try:
+        with open('extensions.json', 'w') as f:
+            json.dump(extensions, f, indent=4)
+    except Exception as e:
+        logging.error(f"Error saving extensions: {e}")
+
+@app.route('/useful-extensions')
+@login_required
+def useful_extensions():
+    if not (current_user.has_download_extension_permission or current_user.has_add_extensions_permission):
+        flash('You do not have permission to access this service.', 'error')
+        return redirect(url_for('services'))
+    extensions = load_extensions()
+    return render_template('useful_extensions.html', extensions=extensions)
+
+@app.route('/api/extensions', methods=['POST'])
+@login_required
+def add_extension():
+    if not current_user.has_add_extensions_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    ext_id = request.form.get('id')
+    name = request.form.get('name')
+    creator = request.form.get('creator')
+    browser = request.form.get('browser')
+    file = request.files.get('file')
+    
+    if not all([ext_id, name, creator, browser, file]):
+        return jsonify({'error': 'All fields are required'}), 400
+        
+    filename = f"{ext_id}_{int(time.time())}.rar"
+    upload_path = os.path.join('static/downloads', filename)
+    os.makedirs('static/downloads', exist_ok=True)
+    file.save(upload_path)
+    
+    extensions = load_extensions()
+    new_ext = {
+        'id': ext_id,
+        'name': name,
+        'creator': creator,
+        'browser': browser,
+        'filename': filename,
+        'date': datetime.now().strftime('%Y-%m-%d %H:%M')
+    }
+    extensions.append(new_ext)
+    save_extensions(extensions)
+    
+    return jsonify({'success': True})
+
+@app.route('/api/extensions/<ext_id>', methods=['DELETE'])
+@login_required
+def delete_extension(ext_id):
+    if not current_user.has_add_extensions_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    extensions = load_extensions()
+    updated_extensions = [e for e in extensions if e['id'] != ext_id]
+    
+    # Optional: Delete file
+    ext_to_delete = next((e for e in extensions if e['id'] == ext_id), None)
+    if ext_to_delete:
+        try:
+            os.remove(os.path.join('static/downloads', ext_to_delete['filename']))
+        except:
+            pass
+            
+    save_extensions(updated_extensions)
+    return jsonify({'success': True})
