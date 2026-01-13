@@ -2719,10 +2719,8 @@ def check_blacklists_stream():
         logging.error(f"Error in check_blacklists_stream: {e}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
 application = app
+
 # --- Useful Extensions Service ---
 def load_extensions():
     try:
@@ -2803,3 +2801,6 @@ def delete_extension(ext_id):
             
     save_extensions(updated_extensions)
     return jsonify({'success': True})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

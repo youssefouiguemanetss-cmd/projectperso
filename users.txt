@@ -2,7 +2,7 @@
 # Permissions can be: ok, allow_add_gmail_of_news (or both separated by comma)
 TSS2,Abdelali,abdelali,TrIaOIaaq2EcLi3LLSgcdWz3,ok,Extract_emails,Domain_checker,blacklist_lookup
 TSSW,Redouan,redouan,red123*00,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup
-TSSW,Y. Ouiguemane,y.ouiguemane,y.ouiguemane2234,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup
+TSSW,Y. Ouiguemane,y.ouiguemane,y.ouiguemane2234,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension
 TSS2,M. Edraoui,M.Edraoui,vYfeg2C5SXo8lbmQ8eai4t1,gmass
 TSS2,H. Boudfa,H.BOUDFA,5C56giIhxd3L3pKkzPB5QTW,gmass
 TSS2,I. Ait Hadi,I.Ait_Hadi,Q13T2v52HGNdVoJe7hs59pQ,gmass
