@@ -2683,8 +2683,8 @@ def check_blacklists_stream():
             results = []
             completed = 0
             
-            # Use ThreadPoolExecutor for parallel processing (20 concurrent to avoid DNS rate limiting)
-            with ThreadPoolExecutor(max_workers=20) as executor:
+            # Use ThreadPoolExecutor for parallel processing (50 concurrent to avoid DNS rate limiting)
+            with ThreadPoolExecutor(max_workers=50) as executor:
                 futures = {executor.submit(check_single_entry, entry): entry for entry in valid_entries}
                 
                 for future in as_completed(futures):

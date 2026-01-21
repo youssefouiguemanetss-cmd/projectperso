@@ -45,6 +45,29 @@
     </div>
 
     <div class="container mx-auto px-4 py-8">
+	
+	<!-- Installation Guides -->
+<div class="glass-card rounded-xl p-6 mb-8">
+    <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">How to Install These Extensions</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button onclick="showInstallGuide('chrome')"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center">
+            <i class="fab fa-chrome mr-2 text-xl"></i> Chrome Guide
+        </button>
+        
+        <button onclick="showInstallGuide('firefox')"
+                class="bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center">
+            <i class="fab fa-firefox mr-2 text-xl"></i> Firefox Guide
+        </button>
+        
+        <button onclick="showInstallGuide('icedragon')"
+                class="bg-cyan-600 hover:bg-cyan-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center">
+            <i class="fas fa-snowflake mr-2 text-xl"></i> IceDragon Guide
+        </button>
+    </div>
+</div>
+
+
         <!-- Filters -->
         <div class="glass-card rounded-xl p-6 mb-8 flex flex-wrap gap-4 items-center">
             <div class="flex-1 min-w-[300px]">
@@ -57,12 +80,37 @@
             <div class="w-48">
                 <select id="browserFilter" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none">
                     <option value="all">All Browsers</option>
-                    <option value="Chrom">Chrome</option>
+                    <option value="Chrome">Chrome</option>
                     <option value="firefox">Firefox</option>
                     <option value="icedragon">IceDragon</option>
                 </select>
             </div>
         </div>
+
+
+
+
+
+
+<!-- Installation Guide Modal -->
+<div id="installGuideModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+    <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-60"></div>
+    <div class="modal-container bg-white w-11/12 md:max-w-lg mx-auto rounded-xl shadow-2xl z-50 overflow-y-auto max-h-[85vh]">
+        <div class="modal-content py-5 text-left px-6">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 id="guideTitle" class="text-2xl font-bold text-gray-800"></h3>
+                <button onclick="closeInstallGuide()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <div id="guideContent" class="mt-5 text-gray-700 space-y-4">
+                <!-- Content will be filled by JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
 
         <!-- Table -->
         <div class="glass-card rounded-xl overflow-hidden shadow-xl">
@@ -73,7 +121,7 @@
                         <th class="px-6 py-4 font-semibold text-gray-700">ID</th>
                         <th class="px-6 py-4 font-semibold text-gray-700">Browser</th>
                         <th class="px-6 py-4 font-semibold text-gray-700">Creator</th>
-                        <th class="px-6 py-4 font-semibold text-gray-700">Date</th>
+                        <th class="px-6 py-4 font-semibold text-gray-700">Lasts Updates</th>
                         <th class="px-6 py-4 font-semibold text-gray-700 text-center">Actions</th>
                     </tr>
                 </thead>
@@ -145,7 +193,7 @@
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">Browser Type</label>
                         <select name="browser" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none">
-                            <option value="Chrom">Chrome</option>
+                            <option value="Chrome">Chrome</option>
                             <option value="firefox">Firefox</option>
                             <option value="icedragon">IceDragon</option>
                         </select>
@@ -172,6 +220,82 @@
     </div>
 
     <script>
+	function showInstallGuide(browser) {
+    const modal = document.getElementById('installGuideModal');
+    const titleEl = document.getElementById('guideTitle');
+    const contentEl = document.getElementById('guideContent');
+
+    let title = '';
+    let content = '';
+
+    if (browser === 'chrome') {
+        title = 'How to Install on Google Chrome';
+        content = `
+            <p>All extensions come in .rar file From tsstools.online</p>
+            <ol class="list-decimal pl-5 space-y-2">
+			<li>Extract the .rar file (you'll usually get a <strong>.json & .js</strong> files)</li>
+                <li>Open Chrome and go to <strong>chrome://extensions/</strong></li>
+                <li>Enable <strong>Developer mode</strong> (toggle in top right)</li>
+                <li>You now have two good options:
+                    <ul class="list-disc pl-5 mt-2 space-y-1">
+                        <li><strong>Recommended:</strong> Click <strong>Load unpacked</strong> and select the folder extension</li>
+                        <li>Alternative: Drag & drop the <strong>folder</strong> directly into the extensions page</li>
+                    </ul>
+                </li>
+                <li>Confirm installation when prompted</li>
+                <li>Done! The extension should appear in your toolbar</li>
+            </ol>
+            <p class="text-sm text-gray-500 mt-4 italic">Note: Chrome may show a warning about developer mode — this is normal for sideloaded extensions.</p>
+        `;
+    } 
+    else if (browser === 'firefox') {
+        title = 'How to Install on Mozilla Firefox';
+        content = `
+            <p>All extensions come in .rar file From tsstools.online</p>
+            <ol class="list-decimal pl-5 space-y-2">
+                <li>Extract the .rar file (you'll usually get a <strong>.json</strong> file)</li>
+                <li>Open Firefox and go to <strong>about:debugging#/runtime/this-firefox</strong>  for direct access</li>
+				<li>click the button: <strong>Load Temporary Add-on…</strong> Under the This Firefox section</li>
+                <li>In the file picker that opens
+                    <ul class="list-disc pl-5 mt-2 space-y-1">
+                        <li>Navigate to your extension folder</li>
+                        <li>Select the <strong>manifest.json</strong> file</li>
+                    </ul>
+                </li>
+                <li>Click <strong>Add</strong> / <strong>Install</strong> when prompted</li>
+                <li>Restart Firefox if asked</li>
+            </ol>
+            <p class="text-sm text-gray-500 mt-4 italic">Note: Some newer Firefox versions may require temporary install via about:debugging (Load Temporary Add-on).</p>
+        `;
+    } 
+    else if (browser === 'icedragon') {
+        title = 'How to Install on Comodo IceDragon';
+        content = `
+            <p>IceDragon is fully compatible with Firefox extensions — same methods work!</p>
+            <ol class="list-decimal pl-5 space-y-2">
+                <li>Extract the .rar file</li>
+                <li>Open IceDragon → click the hamburger menu (top right) → <strong>Add-ons</strong></li>
+                <li>Click the gear icon → choose <strong>Install Add-on From File...</strong></li>
+                <li>Select your extracted <strong>manifest.json</strong> file</li>
+                <li>Click <strong>Install</strong> / <strong>Add</strong> when prompted</li>
+                <li>Restart the browser if necessary</li>
+            </ol>
+            <p class="text-sm text-gray-500 mt-4 italic">Alternative: Just drag & drop the .xpi file into the IceDragon window — it works the same as in Firefox.</p>
+        `;
+    }
+
+    titleEl.textContent = title;
+    contentEl.innerHTML = content;
+
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    document.body.classList.add('modal-active');
+}
+
+function closeInstallGuide() {
+    const modal = document.getElementById('installGuideModal');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    document.body.classList.remove('modal-active');
+}
         function toggleModal() {
             const body = document.querySelector('body');
             const modal = document.getElementById('modal');
