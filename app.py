@@ -2424,9 +2424,25 @@ def blacklist_lookup():
         return redirect(url_for('services'))
     return render_template('blacklist_lookup.html')
 
-# Spamhaus DQS Key from environment (with fallback like ipchecker.py)
-DQS_KEY = os.environ.get("DQS_KEY", "f3jqdoqpeyipweiizk7onufnlm")
-print(f"[BLACKLIST] DQS_KEY loaded: {DQS_KEY[:8]}... (length: {len(DQS_KEY)})")
+# Spamhaus DQS Key Manager for load balancing
+import threading
+
+class DQSKeyManager:
+    def __init__(self, keys_string):
+        self.keys = [k.strip() for k in keys_string.split(',') if k.strip()]
+        self.index = 0
+        self.lock = threading.Lock()
+
+    def get_key(self):
+        with self.lock:
+            if not self.keys:
+                return "f3jqdoqpeyipweiizk7onufnlm" # Fallback
+            key = self.keys[self.index]
+            self.index = (self.index + 1) % len(self.keys)
+            return key
+
+dqs_keys_env = os.environ.get("DQS_KEYS", os.environ.get("DQS_KEY", "f3jqdoqpeyipweiizk7onufnlm,tfpurh2dwpwbxt4ylugrjtqexm"))
+dqs_manager = DQSKeyManager(dqs_keys_env)
 
 # Regex patterns for validation
 import re
@@ -2468,18 +2484,18 @@ def expand_ipv6(ip):
     except ValueError:
         return None
 
-def check_spamhaus_ip(ip):
+def check_spamhaus_ip(ip, dqs_key):
     """Check IP against Spamhaus blocklists - supports both IPv4 and IPv6"""
     try:
         if is_ipv4(ip):
             rev = ".".join(ip.split(".")[::-1])
-            query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
+            query = f"{rev}.{dqs_key}.zen.dq.spamhaus.net"
         elif is_ipv6(ip):
             expanded = expand_ipv6(ip)
             if not expanded:
                 return set()
             rev = ".".join(reversed(expanded))
-            query = f"{rev}.{DQS_KEY}.zen.dq.spamhaus.net"
+            query = f"{rev}.{dqs_key}.zen.dq.spamhaus.net"
         else:
             return set()
         
@@ -2528,10 +2544,10 @@ def check_barracuda(ip):
     except Exception:
         return False
 
-def check_spamhaus_domain(domain):
+def check_spamhaus_domain(domain, dqs_key):
     """Check domain against Spamhaus DBL - EXACT copy from ipchecker.py"""
     try:
-        query = f"{domain}.{DQS_KEY}.dbl.dq.spamhaus.net"
+        query = f"{domain}.{dqs_key}.dbl.dq.spamhaus.net"
         answers = blacklist_resolver.resolve(query, "A")
         if any(r.to_text().startswith("127.0.1.") for r in answers):
             return "dbl"
@@ -2541,7 +2557,7 @@ def check_spamhaus_domain(domain):
     except Exception:
         return None
 
-def check_single_entry(entry_data):
+def check_single_entry(entry_data, dqs_key):
     """Check a single IP/domain entry against all blacklists - for parallel processing
     Uses EXACT same logic as ipchecker.py process_item function"""
     idx, serveur, ip, domain, status = entry_data
@@ -2563,7 +2579,7 @@ def check_single_entry(entry_data):
     
     # Check IP blocklists only if IP is provided (same logic as ipchecker.py)
     if ip:
-        spamhaus_results = check_spamhaus_ip(ip)
+        spamhaus_results = check_spamhaus_ip(ip, dqs_key)
         barracuda = check_barracuda(ip)
         
         # Map spamhaus results to the correct columns (handles multiple)
@@ -2575,7 +2591,7 @@ def check_single_entry(entry_data):
     
     # Check domain blocklist only if domain is provided
     if domain:
-        dbl_result = check_spamhaus_domain(domain)
+        dbl_result = check_spamhaus_domain(domain, dqs_key)
         if dbl_result == "dbl":
             result['dbl'] = 'Listed'
     
@@ -2677,6 +2693,10 @@ def check_blacklists_stream():
         
         total = len(valid_entries)
         
+        # Get a DQS key for THIS process/request
+        request_dqs_key = dqs_manager.get_key()
+        print(f"[BLACKLIST] Process starting with DQS_KEY: {request_dqs_key[:8]}...")
+        
         def generate():
             yield f"data: {json.dumps({'type': 'start', 'total': total, 'errors': errors})}\n\n"
             
@@ -2685,7 +2705,7 @@ def check_blacklists_stream():
             
             # Use ThreadPoolExecutor for parallel processing (50 concurrent to avoid DNS rate limiting)
             with ThreadPoolExecutor(max_workers=50) as executor:
-                futures = {executor.submit(check_single_entry, entry): entry for entry in valid_entries}
+                futures = {executor.submit(check_single_entry, entry, request_dqs_key): entry for entry in valid_entries}
                 
                 for future in as_completed(futures):
                     try:
