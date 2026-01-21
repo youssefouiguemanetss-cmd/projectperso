@@ -382,7 +382,7 @@
                     <div id="pagination-section" class="mt-4 flex items-center justify-between">
                         <div class="text-sm text-gray-600">
                             Showing <span id="showing-start">0</span>-<span id="showing-end">0</span> of <span id="showing-total">0</span> results
-							<!-- Add this new select here -->
+                                                        <!-- Add this new select here -->
         <div class="flex items-center gap-2">
             <label for="page-size" class="text-sm font-medium text-gray-700">Rows per page:</label>
             <select id="page-size" class="select-filter text-sm border border-gray-300 rounded-lg px-3 py-1">
@@ -477,9 +477,9 @@
         });
 
         document.getElementById('reset-filters-btn').addEventListener('click', resetFilters);
-		
-		
-		document.getElementById('page-size').addEventListener('change', function () {
+                
+                
+                document.getElementById('page-size').addEventListener('change', function () {
     const value = this.value;
 
     if (value === 'all') {
@@ -803,6 +803,7 @@ try {
                 .filter(r => r.css === 'Clean' && r.pbl === 'Clean' && r.xbl === 'Clean' && 
                            r.sbl === 'Clean' && r.barracuda === 'Clean' && r.dbl === 'Clean')
                 .map(r => r.ip)
+                .filter(ip => ip && ip.trim())
                 .join('\n');
             
             if (!cleanIPs) {
@@ -810,10 +811,35 @@ try {
                 return;
             }
             
-            navigator.clipboard.writeText(cleanIPs).then(() => {
-                const count = cleanIPs.split('\n').length;
-                showToast(`Copied ${count} clean IP${count !== 1 ? 's' : ''} to clipboard!`);
-            });
+            function copyTextFallback(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(cleanIPs).then(() => {
+                        const count = cleanIPs.split('\n').length;
+                        showToast(`Copied ${count} clean IP${count !== 1 ? 's' : ''} to clipboard!`);
+                    }).catch(err => {
+                        copyTextFallback(cleanIPs);
+                        const count = cleanIPs.split('\n').length;
+                        showToast(`Copied ${count} clean IP${count !== 1 ? 's' : ''} to clipboard!`);
+                    });
+                } else {
+                    copyTextFallback(cleanIPs);
+                    const count = cleanIPs.split('\n').length;
+                    showToast(`Copied ${count} clean IP${count !== 1 ? 's' : ''} to clipboard!`);
+                }
+            } catch (e) {
+                showToast('Failed to copy', 'error');
+            }
         }
 
         function exportCSV() {

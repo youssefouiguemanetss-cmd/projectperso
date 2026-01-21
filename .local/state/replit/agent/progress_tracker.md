@@ -131,3 +131,4 @@
 [x] 105. Blacklist Lookup: Added DQSKeyManager for load balancing between multiple DQS keys
 [x] 106. Blacklist Lookup: Updated check_blacklists_stream to use a single key per process while cycling through available keys
 [x] 107. Blacklist Lookup: Verified multiple DQS keys support (f3jqdoqp... and tfpurh2d...)
+[x] 108. Blacklist Lookup: Fixed "Copy Clean IPs" button with robust fallback for non-secure contexts or permission issues
