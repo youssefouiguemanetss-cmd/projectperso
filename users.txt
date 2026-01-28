@@ -1,40 +1,39 @@
 # Format: entity,Name,username,password[,permissions]
 # Permissions can be: ok, allow_add_gmail_of_news (or both separated by comma)
-TSS2,Abdelali,abdelali,TrIaOIaaq2EcLi3LLSgcdWz3,ok,Extract_emails,Domain_checker,blacklist_lookup
-TSSW,Redouan,redouan,red123*00,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions
-TSSW,Y. Ouiguemane,y.ouiguemane,y.ouiguemane2234,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions
+TSS2,Abdelali Akrrou,abdelali,TrIaOIaaq2EcLi3LLSgcdWz3,ok,Extract_emails,Domain_checker,blacklist_lookup,download_extension
+TSSW,Redouan El Arras,redouan,red123*00,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions
+TSSW,Youssef Ouiguemane,y.ouiguemane,y.ouiguemane2234,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions
 TSS2,M. Edraoui,M.Edraoui,vYfeg2C5SXo8lbmQ8eai4t1,gmass
-TSS2,H. Boudfa,H.BOUDFA,5C56giIhxd3L3pKkzPB5QTW,gmass
-TSS2,I. Ait Hadi,I.Ait_Hadi,Q13T2v52HGNdVoJe7hs59pQ,gmass
-TSS2,R. El Abdellaoui,R.El_Abdellaoui,KIB05zGqmYFf36x5zqK2iBS,gmass
-TSS2,H. Ahaddouch,H.AHADDOUCH,3oM5UULBZuDWiEDb2l1EN1X,gmass
-TSS2,Adnan,Adnan,efa3Jwe4g7Ei3c0I94NMDER,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup
+TSS2,HAMZA BOUDFA,H.BOUDFA,5C56giIhxd3L3pKkzPB5QTW,gmass
+TSS2,Ikram Ait Hadi,I.Ait_Hadi,Q13T2v52HGNdVoJe7hs59pQ,gmass
+TSS2,Roumayssaa El Abdellaoui,R.El_Abdellaoui,KIB05zGqmYFf36x5zqK2iBS,gmass
+TSS2,Hajar AHADDOUCH,H.AHADDOUCH,3oM5UULBZuDWiEDb2l1EN1X,gmass
+TSS2,Adnan Belguin,Adnan,efa3Jwe4g7Ei3c0I94NMDER,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup,download_extension
 TSS3,Adil Benmoussa,AdilBenmoussa,2LOj6VWMtkrh38mI,gmass
 TSS3,Ayoub Lakbir,AYOUBLAKBIR,wKQD673jQBJGFt1q,gmass
 TSS3,Soufian Akdi,SoufianAKDI,7KTEAfGwzk1H,gmass
 TSS3,Elarjoun Moustapha,ElarjounMOUSTAPHA,qu4PYrbMDSbhkvsZmj,gmass
 TSS3,Nihad El Bazi,NihadEl_Bazi,zyd7ztQ7P47Rrsj,gmass
-TSS3,Ouzzanabil,ouzzanabil,RMrXh9m33MF8N,gmass
 TSS3,El Harras Rhimou,ElHarrasRHIMOU,QfyXaSJ6qPX,gmass
 TSSF,El Morabit Mariam,ElmorabitMariam,42G6jTsuz3q,gmass
 TSSF,Arifi Chakir,ArifiChakir,m1yn5xPSeZv,gmass
-TSSF,Ahmimed Aya,AhmimedAya,5TkCUunjJjK,gmass
-TSSF,Ahmimed Alae,AhmimedAlae,HDaA4T4ntg1,gmass
+TSSF,Aya Ahmimed,AhmimedAya,5TkCUunjJjK,gmass
+TSSF,Alae Ahmimed,AhmimedAlae,HDaA4T4ntg1,gmass
 TSSF,El Alilti Yassine,ELaliltiYassine,uCG75qf4H5n,gmass
-TSS3,M. Amine Elmorabet,M.Amine_Elmorabet,bC18wSC8mjShczF,ok,,find_news,Extract_emails,Domain_checker,gmass,blacklist_lookup
+TSS3,M. Amine Elmorabet,M.Amine_Elmorabet,bC18wSC8mjShczF,ok,find_news,Extract_emails,Domain_checker,gmass,blacklist_lookup,download_extension,
 TSSF,Rabab Loumrani,Rabab_Loumrani,7P6Aavr2TX8Whes,ok,Extract_emails,Domain_checker,gmass
-TSS1,Mohamed Amine Tahri,Mohamedamine_tahri,81bOnasisatha,gmass
+TSS1,Mohamed Amin Tahri,Mohamedamine_tahri,81bOnasisatha,gmass
 TSS1,Issam Tchikou,Issam_Tchikou,phigosUb6qiVA,gmass
-TSS1,El Alilti Yassine,El Alilti_Yassine,9unlbeblxujAp,gmass
+TSS1,Yassine El Alilti,El Alilti_Yassine,9unlbeblxujAp,gmass
 TSS1,Ahmimed Alae,Ahmimed_Alae,0LspetHe4oN7g,gmass
 TSS1,Ghoufran Hachlaf,GHOUFRAN_HACHLAF,fab5d3pROcrlB,gmass
-TSS1,Soufiane Saadi,SOUFIANE_SAADI,cH5qephl9ozaf,gmass
+TSS1,Soufyane SAAIDI,SOUFIANE_SAADI,cH5qephl9ozaf,gmass
 TSS1,Taoufik Razak,TAOUFIK_RAZAK,fuDrEDaqlqI12,gmass
 TSS1,Youssef Chakour,YOUSSEF_CHAKOUR,glbrLd1i3LYIz,gmass
-TSS1,Ouessan Benayad,ouessan_benayad,fodOs0ukIdrAv,gmass
-TSS1,Omar El Outmani,omar_eloutmani,2HLvIvat7oswl,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup
-TSS1,Oussama Almorabet,oussama_almorabet,niHUditRet2lg,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup
-TSS3,Khaoula Oughanem,Khaoula.Oughanem,trA6r6hlFoph,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup
+TSS1,ouessan benayad,ouessan_benayad,fodOs0ukIdrAv,gmass
+TSS1,Omar El Outmani,omar_eloutmani,2HLvIvat7oswl,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup,download_extension
+TSS1,Oussama Almorabet,oussama_almorabet,niHUditRet2lg,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup,download_extension
+TSS3,Khaoula OUGHANEM,Khaoula.Oughanem,trA6r6hlFoph,ok,Extract_emails,Domain_checker,gmass,blacklist_lookup,download_extension
 TSS3,Mariam El Morabit,Mariam_ElMORABIT,yuR0frozUfrU6os,gmass
 TSSW,TSSW SUPPORT,tssw_support,qnZVf3954H6N,blacklist_lookup
-TSS3,Manager Faissal,faissal_tss3,34O5KaNJ7SKcDdf,Extract_emails,Domain_checker,allow_add_gmail_of_news,gmass,blacklist_lookup
+TSS3,Faissal Errahmouni,faissal_tss3,34O5KaNJ7SKcDdf,Extract_emails,Domain_checker,allow_add_gmail_of_news,gmass,blacklist_lookup,download_extension
