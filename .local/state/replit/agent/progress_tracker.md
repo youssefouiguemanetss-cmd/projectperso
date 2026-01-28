@@ -132,3 +132,8 @@
 [x] 106. Blacklist Lookup: Updated check_blacklists_stream to use a single key per process while cycling through available keys
 [x] 107. Blacklist Lookup: Verified multiple DQS keys support (f3jqdoqp... and tfpurh2d...)
 [x] 108. Blacklist Lookup: Fixed "Copy Clean IPs" button with robust fallback for non-secure contexts or permission issues
+[x] 109. Environment migration - Jan 28, 2026 - reinstalled Python packages (gunicorn, flask, flask-login, flask-sqlalchemy, psycopg2-binary, email-validator)
+[x] 110. Reconfigured workflow with webview output type and port 5000 binding
+[x] 111. Verified application running successfully - workflow status: RUNNING, gunicorn listening on port 5000
+[x] 112. Screenshot confirmed TSS Gmail Access login page displays correctly
+[x] 113. Import migration to Replit environment completed - all items marked as done
