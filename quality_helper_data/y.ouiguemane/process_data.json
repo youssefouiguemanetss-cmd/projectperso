@@ -1,0 +1,54 @@
+{
+  "status": "completed",
+  "created_at": "2026-01-28T23:53:48.041651",
+  "keywords_used": [
+    "startup team",
+    "business growth",
+    "remote work",
+    "creative office"
+  ],
+  "total_requested": 4,
+  "total_fetched": 4,
+  "subjects": [
+    "When a brand realized it needed a app development service",
+    "How a business consulting service helped a business grow fast",
+    "Why one company invested in a seo optimization service",
+    "How a business consulting service helped a business grow fast"
+  ],
+  "images": [
+    {
+      "filename": "When_a_brand_realized_it_needed_a_app_development_service.jpg",
+      "url": "https://thecollection527.com/wp-content/uploads/2022/01/6-Tips-for-Building-the-Most-Successful-Startup-Team-1024x768.jpg",
+      "keyword": "startup team",
+      "subject": "When a brand realized it needed a app development service",
+      "size_kb": 147
+    },
+    {
+      "filename": "How_a_business_consulting_service_helped_a_business_grow_fast.jpg",
+      "url": "https://business.amazon.in/assets/in/22nd-nov/2880_960_2311.jpg.transform/2880x960/image.jpg",
+      "keyword": "business growth",
+      "subject": "How a business consulting service helped a business grow fast",
+      "size_kb": 125
+    },
+    {
+      "filename": "Why_one_company_invested_in_a_seo_optimization_service.jpg",
+      "url": "https://remoteco.s3.amazonaws.com/wp-content/uploads/2024/02/21181056/10-Remote-Jobs-That-Pay-Well-With-Little-or-No-Experience-Required.jpg",
+      "keyword": "remote work",
+      "subject": "Why one company invested in a seo optimization service",
+      "size_kb": 60
+    },
+    {
+      "filename": "How_a_business_consulting_service_helped_a_business_grow_fast.jpg",
+      "url": "https://i.pinimg.com/originals/3c/aa/6e/3caa6e69e360d72f101ba1a849267aae.jpg",
+      "keyword": "creative office",
+      "subject": "How a business consulting service helped a business grow fast",
+      "size_kb": 184
+    }
+  ],
+  "image_links": [
+    "https://thecollection527.com/wp-content/uploads/2022/01/6-Tips-for-Building-the-Most-Successful-Startup-Team-1024x768.jpg",
+    "https://business.amazon.in/assets/in/22nd-nov/2880_960_2311.jpg.transform/2880x960/image.jpg",
+    "https://remoteco.s3.amazonaws.com/wp-content/uploads/2024/02/21181056/10-Remote-Jobs-That-Pay-Well-With-Little-or-No-Experience-Required.jpg",
+    "https://i.pinimg.com/originals/3c/aa/6e/3caa6e69e360d72f101ba1a849267aae.jpg"
+  ]
+}
