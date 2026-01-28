@@ -188,3 +188,15 @@ flask-sqlalchemy
 gunicorn
 psycopg2-binary
 playwright
+email_validator
+flask
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
+requests
+email-validator
+flask
+flask-login
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
