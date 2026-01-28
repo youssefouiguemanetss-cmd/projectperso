@@ -102,7 +102,6 @@ def delete_user_process(username):
 
 def run_image_generation(username, keywords, total_images):
     from playwright.sync_api import sync_playwright
-    from concurrent.futures import ThreadPoolExecutor
     
     user_processes[username] = {
         'running': True,
@@ -130,15 +129,11 @@ def run_image_generation(username, keywords, total_images):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(user_agent=UA)
+            page = context.new_page()
             
-            # Use fewer pages for safety, but enough for speed
-            num_workers = min(5, total_images)
-            pages = [context.new_page() for _ in range(num_workers)]
-            
-            def process_keyword(args):
-                idx, keyword, page = args
+            for idx, keyword in enumerate(selected_keywords):
                 if not user_processes.get(username, {}).get('running', False):
-                    return None
+                    break
                     
                 user_processes[username]['status'] = f'Searching: {keyword}'
                 
@@ -146,7 +141,7 @@ def run_image_generation(username, keywords, total_images):
                     # Faster search URL
                     page.goto(
                         f"https://www.bing.com/images/search?q={keyword}&first=1",
-                        wait_until="commit", # Faster than domcontentloaded
+                        wait_until="commit",
                         timeout=30000,
                     )
                     
@@ -154,7 +149,7 @@ def run_image_generation(username, keywords, total_images):
                     results = page.query_selector_all("a.iusc")
                     random.shuffle(results)
                     
-                    for item in results[:10]: # Check only first 10 for speed
+                    for item in results[:10]:
                         data_m = item.get_attribute("m")
                         if not data_m:
                             continue
@@ -175,7 +170,7 @@ def run_image_generation(username, keywords, total_images):
                                     "User-Agent": UA,
                                     "Referer": "https://www.bing.com/",
                                 },
-                                timeout=10, # Reduced timeout
+                                timeout=10,
                             )
                             
                             ct = r.headers.get("Content-Type", "").lower()
@@ -197,37 +192,22 @@ def run_image_generation(username, keywords, total_images):
                             with open(path, "wb") as f:
                                 f.write(r.content)
                             
-                            return {
+                            image_data.append({
                                 'filename': filename,
                                 'url': img_url,
                                 'keyword': keyword,
                                 'subject': subject,
                                 'size_kb': size // 1024
-                            }
+                            })
+                            subjects.append(subject)
+                            user_processes[username]['progress'] += 1
+                            break # Found one, move to next keyword
                             
                         except:
                             continue
-                    return None
                 except Exception as e:
                     logging.error(f"Error searching for {keyword}: {e}")
-                    return None
-
-            # Process in batches to use the pages
-            for i in range(0, len(selected_keywords), num_workers):
-                if not user_processes.get(username, {}).get('running', False):
-                    break
-                    
-                batch = selected_keywords[i:i+num_workers]
-                tasks = [(i + j, kw, pages[j]) for j, kw in enumerate(batch)]
-                
-                with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                    results = list(executor.map(process_keyword, tasks))
-                    
-                for res in results:
-                    if res:
-                        image_data.append(res)
-                        subjects.append(res['subject'])
-                        user_processes[username]['progress'] += 1
+                    continue
 
             browser.close()
         
@@ -239,7 +219,7 @@ def run_image_generation(username, keywords, total_images):
             'total_fetched': len(image_data),
             'subjects': subjects,
             'images': image_data,
-            'image_links': [img['filename'] for img in image_data] # Using filename as link as requested
+            'image_links': [img['filename'] for img in image_data]
         }
         
         save_user_process_data(username, process_data)
