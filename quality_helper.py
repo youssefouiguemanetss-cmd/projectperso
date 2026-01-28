@@ -102,6 +102,7 @@ def delete_user_process(username):
 
 def run_image_generation(username, keywords, total_images):
     from playwright.sync_api import sync_playwright
+    from concurrent.futures import ThreadPoolExecutor
     
     user_processes[username] = {
         'running': True,
@@ -129,27 +130,31 @@ def run_image_generation(username, keywords, total_images):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(user_agent=UA)
-            page = context.new_page()
             
-            for idx, keyword in enumerate(selected_keywords):
+            # Use fewer pages for safety, but enough for speed
+            num_workers = min(5, total_images)
+            pages = [context.new_page() for _ in range(num_workers)]
+            
+            def process_keyword(args):
+                idx, keyword, page = args
                 if not user_processes.get(username, {}).get('running', False):
-                    break
+                    return None
                     
-                user_processes[username]['progress'] = idx
                 user_processes[username]['status'] = f'Searching: {keyword}'
                 
                 try:
+                    # Faster search URL
                     page.goto(
-                        f"https://www.bing.com/images/search?q={keyword}&form=HDRSC2",
-                        wait_until="domcontentloaded",
-                        timeout=60000,
+                        f"https://www.bing.com/images/search?q={keyword}&first=1",
+                        wait_until="commit", # Faster than domcontentloaded
+                        timeout=30000,
                     )
                     
-                    page.wait_for_selector("a.iusc", timeout=15000)
+                    page.wait_for_selector("a.iusc", timeout=10000)
                     results = page.query_selector_all("a.iusc")
                     random.shuffle(results)
                     
-                    for item in results:
+                    for item in results[:10]: # Check only first 10 for speed
                         data_m = item.get_attribute("m")
                         if not data_m:
                             continue
@@ -163,10 +168,6 @@ def run_image_generation(username, keywords, total_images):
                         if not img_url or not img_url.startswith("http"):
                             continue
                         
-                        ext = os.path.splitext(img_url.split("?")[0])[1].lower()
-                        if ext in SKIP_EXTENSIONS:
-                            continue
-                        
                         try:
                             r = requests.get(
                                 img_url,
@@ -174,7 +175,7 @@ def run_image_generation(username, keywords, total_images):
                                     "User-Agent": UA,
                                     "Referer": "https://www.bing.com/",
                                 },
-                                timeout=20,
+                                timeout=10, # Reduced timeout
                             )
                             
                             ct = r.headers.get("Content-Type", "").lower()
@@ -188,11 +189,7 @@ def run_image_generation(username, keywords, total_images):
                             ):
                                 continue
                             
-                            if "webp" in ct:
-                                continue
-                            
                             ext = ".png" if "png" in ct else ".jpg"
-                            
                             subject = generate_subject()
                             filename = f"{clean_filename(subject)}{ext}"
                             path = os.path.join(images_dir, filename)
@@ -200,27 +197,38 @@ def run_image_generation(username, keywords, total_images):
                             with open(path, "wb") as f:
                                 f.write(r.content)
                             
-                            subjects.append(subject)
-                            image_data.append({
+                            return {
                                 'filename': filename,
                                 'url': img_url,
                                 'keyword': keyword,
                                 'subject': subject,
                                 'size_kb': size // 1024
-                            })
+                            }
                             
-                            break
-                            
-                        except Exception as e:
-                            logging.error(f"Download failed for {keyword}: {e}")
+                        except:
                             continue
-                    
-                    time.sleep(0.5)
-                    
+                    return None
                 except Exception as e:
                     logging.error(f"Error searching for {keyword}: {e}")
-                    continue
-            
+                    return None
+
+            # Process in batches to use the pages
+            for i in range(0, len(selected_keywords), num_workers):
+                if not user_processes.get(username, {}).get('running', False):
+                    break
+                    
+                batch = selected_keywords[i:i+num_workers]
+                tasks = [(i + j, kw, pages[j]) for j, kw in enumerate(batch)]
+                
+                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    results = list(executor.map(process_keyword, tasks))
+                    
+                for res in results:
+                    if res:
+                        image_data.append(res)
+                        subjects.append(res['subject'])
+                        user_processes[username]['progress'] += 1
+
             browser.close()
         
         process_data = {
@@ -231,7 +239,7 @@ def run_image_generation(username, keywords, total_images):
             'total_fetched': len(image_data),
             'subjects': subjects,
             'images': image_data,
-            'image_links': [img['url'] for img in image_data]
+            'image_links': [img['filename'] for img in image_data] # Using filename as link as requested
         }
         
         save_user_process_data(username, process_data)
