@@ -137,3 +137,17 @@
 [x] 111. Verified application running successfully - workflow status: RUNNING, gunicorn listening on port 5000
 [x] 112. Screenshot confirmed TSS Gmail Access login page displays correctly
 [x] 113. Import migration to Replit environment completed - all items marked as done
+[x] 114. Quality Seeds Helper Service - Jan 28, 2026:
+    - Added new "Quality Seeds Helper" service with `quality_helper` permission
+    - Implemented "Get Images" script using Playwright for Bing image search
+    - Created user-specific storage folders for process data and images
+    - Added keywords textarea input (one keyword per line)
+    - Added image count input (1-50 images per process)
+    - Implemented real-time progress tracking during image generation
+    - Created image gallery display with results
+    - Added subjects textarea with copy button
+    - Added image links textarea with copy button
+    - Implemented ZIP download for all images
+    - Added process deletion with full cleanup (images + data)
+    - Created sidebar navigation for future script additions
+    - Permission check: `quality_helper` required to access service
