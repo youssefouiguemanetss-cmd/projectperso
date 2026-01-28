@@ -65,6 +65,7 @@ class User(UserMixin):
         self.has_blacklist_lookup_permission = has_blacklist_lookup_permission
         self.has_download_extension_permission = False
         self.has_add_extensions_permission = False
+        self.has_quality_helper_permission = False
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -88,6 +89,7 @@ def load_user(user_id):
             permissions = user_data.get('permissions', [])
             user.has_download_extension_permission = 'download_extension' in permissions
             user.has_add_extensions_permission = 'add_extensions' in permissions
+            user.has_quality_helper_permission = 'quality_helper' in permissions
             return user
     return None
 
@@ -2821,6 +2823,164 @@ def delete_extension(ext_id):
             
     save_extensions(updated_extensions)
     return jsonify({'success': True})
+
+@app.route('/quality-helper')
+@login_required
+def quality_helper():
+    if not current_user.has_quality_helper_permission:
+        flash('You do not have permission to access Quality Seeds Helper.', 'error')
+        return redirect(url_for('services'))
+    return render_template('quality_helper.html')
+
+@app.route('/api/quality-helper/status')
+@login_required
+def quality_helper_status():
+    if not current_user.has_quality_helper_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    from quality_helper import get_user_process_status, is_process_running, user_processes
+    
+    username = current_user.username
+    
+    running_status = user_processes.get(username, {})
+    if running_status.get('running'):
+        return jsonify({
+            'has_process': True,
+            'running': True,
+            'progress': running_status.get('progress', 0),
+            'total': running_status.get('total', 0),
+            'status': running_status.get('status', 'Processing...'),
+            'error': running_status.get('error')
+        })
+    
+    saved_data = get_user_process_status(username)
+    if saved_data:
+        return jsonify({
+            'has_process': True,
+            'running': False,
+            'data': saved_data
+        })
+    
+    return jsonify({'has_process': False, 'running': False})
+
+@app.route('/api/quality-helper/start', methods=['POST'])
+@login_required
+def quality_helper_start():
+    if not current_user.has_quality_helper_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    from quality_helper import is_process_running, get_user_process_status, run_image_generation
+    import threading
+    
+    username = current_user.username
+    
+    if is_process_running(username):
+        return jsonify({'error': 'A process is already running. Please wait for it to complete.'}), 400
+    
+    existing_process = get_user_process_status(username)
+    if existing_process:
+        return jsonify({'error': 'You have an existing process. Please delete it first before starting a new one.'}), 400
+    
+    data = request.get_json()
+    keywords_text = data.get('keywords', '')
+    image_count = data.get('image_count', 1)
+    
+    keywords = [k.strip() for k in keywords_text.strip().split('\n') if k.strip()]
+    
+    if not keywords:
+        return jsonify({'error': 'Please enter at least one keyword.'}), 400
+    
+    try:
+        image_count = int(image_count)
+        if image_count < 1:
+            image_count = 1
+        if image_count > 50:
+            image_count = 50
+    except:
+        image_count = 1
+    
+    if len(keywords) < image_count:
+        return jsonify({'error': f'Not enough keywords ({len(keywords)}) for {image_count} images. Please add more keywords.'}), 400
+    
+    thread = threading.Thread(target=run_image_generation, args=(username, keywords, image_count))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'success': True, 'message': 'Process started'})
+
+@app.route('/api/quality-helper/delete', methods=['POST'])
+@login_required
+def quality_helper_delete():
+    if not current_user.has_quality_helper_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    from quality_helper import delete_user_process, is_process_running
+    
+    username = current_user.username
+    
+    if is_process_running(username):
+        return jsonify({'error': 'Cannot delete while a process is running.'}), 400
+    
+    delete_user_process(username)
+    return jsonify({'success': True, 'message': 'Process deleted successfully'})
+
+@app.route('/api/quality-helper/image/<filename>')
+@login_required
+def quality_helper_image(filename):
+    if not current_user.has_quality_helper_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    from quality_helper import get_user_images_dir
+    import mimetypes
+    
+    username = current_user.username
+    images_dir = get_user_images_dir(username)
+    image_path = os.path.join(images_dir, filename)
+    
+    if not os.path.exists(image_path):
+        return jsonify({'error': 'Image not found'}), 404
+    
+    mime_type, _ = mimetypes.guess_type(filename)
+    if not mime_type:
+        mime_type = 'image/jpeg'
+    
+    with open(image_path, 'rb') as f:
+        image_data = f.read()
+    
+    return Response(image_data, mimetype=mime_type)
+
+@app.route('/api/quality-helper/download-zip')
+@login_required
+def quality_helper_download_zip():
+    if not current_user.has_quality_helper_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    from quality_helper import get_user_images_dir, get_user_process_status
+    import zipfile
+    import io
+    
+    username = current_user.username
+    
+    process_data = get_user_process_status(username)
+    if not process_data:
+        return jsonify({'error': 'No process data found'}), 404
+    
+    images_dir = get_user_images_dir(username)
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for img in process_data.get('images', []):
+            img_path = os.path.join(images_dir, img['filename'])
+            if os.path.exists(img_path):
+                zip_file.write(img_path, img['filename'])
+    
+    zip_buffer.seek(0)
+    
+    return Response(
+        zip_buffer.getvalue(),
+        mimetype='application/zip',
+        headers={'Content-Disposition': f'attachment; filename=images_{username}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip'}
+    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

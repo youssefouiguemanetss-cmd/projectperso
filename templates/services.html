@@ -381,6 +381,54 @@
             </div>
             {% endif %}
 
+            {% if current_user.has_quality_helper_permission %}
+            <!-- Quality Seeds Helper Service -->
+            <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
+                 onclick="window.location.href='{{ url_for('quality_helper') }}'">
+                <div class="text-center">
+                    <!-- Service Icon -->
+                    <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <i class="fas fa-seedling text-white text-2xl"></i>
+                    </div>
+                    
+                    <!-- Service Title -->
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Quality Seeds Helper</h3>
+                    
+                    <!-- Service Description -->
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Enhance your seeds quality with powerful automation scripts. 
+                        Generate images from keywords and manage content efficiently.
+                    </p>
+                    
+                    <!-- Features List -->
+                    <div class="text-left space-y-2 mb-6">
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Keyword-based image generation
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Auto-generated subjects
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            ZIP download & copy functions
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Multiple automation scripts
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="text-white px-6 py-3 rounded-lg transition-colors duration-200 font-semibold" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <i class="fas fa-arrow-right mr-2"></i>
+                        Open Helper
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             {% if current_user.has_download_extension_permission or current_user.has_add_extensions_permission %}
             <!-- Useful Extensions Service -->
             <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
