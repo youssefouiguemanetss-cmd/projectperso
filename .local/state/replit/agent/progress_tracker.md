@@ -161,3 +161,21 @@
 [x] 122. Verified application running successfully - workflow status: RUNNING, gunicorn listening on port 5000
 [x] 123. Screenshot confirmed TSS Gmail Access login page displays correctly
 [x] 124. Import migration to Replit environment completed - all items marked as done
+[x] 125. Quality Seeds Helper: Added "Get PDFs" script - Jan 29, 2026:
+    - New sidebar item for "Get PDFs" in Quality Seeds Helper service
+    - PDF search using arXiv (academic papers)
+    - Keywords input (one per line) with max 50 PDFs per process
+    - PDF filenames: 5+ words, no numbers, max 5MB each
+    - User-specific PDF storage in quality_helper_data/{username}/pdfs/
+    - Real-time progress display ("Processing X/Y..." with progress bar)
+    - Results display with PDF grid, subjects textarea, and PDF links textarea
+    - Copy buttons for subjects and PDF links textareas
+    - Download all PDFs as ZIP file
+    - Delete process (removes PDFs and data)
+    - One process per user (must delete before creating new)
+    - Cannot start new process while one is running
+[x] 126. Added PDF API routes: /api/quality-helper/pdf/status, start, delete, download-zip, serve
+[x] 127. Added PDF functions to quality_helper.py: run_pdf_generation, storage, arXiv integration
+[x] 128. Installed beautifulsoup4 package for HTML parsing
+[x] 129. Verified application running successfully - workflow status: RUNNING
+[x] 130. Get PDFs script implementation completed - all items marked as done
