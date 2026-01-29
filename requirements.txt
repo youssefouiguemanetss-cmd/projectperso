@@ -211,3 +211,4 @@ flask-login
 flask-sqlalchemy
 gunicorn
 psycopg2-binary
+beautifulsoup4
