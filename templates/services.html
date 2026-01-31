@@ -429,6 +429,54 @@
             </div>
             {% endif %}
 
+            {% if current_user.has_news_subscription_permission %}
+            <!-- News Subscription Service -->
+            <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 
+                 onclick="window.location.href='{{ url_for('news_subscription') }}'">
+                <div class="text-center">
+                    <!-- Service Icon -->
+                    <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                        <i class="fas fa-rss text-white text-2xl"></i>
+                    </div>
+                    
+                    <!-- Service Title -->
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">News Subscription</h3>
+                    
+                    <!-- Service Description -->
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Automate website subscriptions and newsletter sign-ups. 
+                        Process multiple domains with real-time progress tracking.
+                    </p>
+                    
+                    <!-- Features List -->
+                    <div class="text-left space-y-2 mb-6">
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Bulk domain processing
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Real-time progress tracking
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Success/failure statistics
+                        </div>
+                        <div class="flex items-center text-sm text-gray-600">
+                            <i class="fas fa-check text-green-500 mr-2"></i>
+                            Stoppable processes
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="text-white px-6 py-3 rounded-lg transition-colors duration-200 font-semibold" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                        <i class="fas fa-arrow-right mr-2"></i>
+                        Open Subscription
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             {% if current_user.has_download_extension_permission or current_user.has_add_extensions_permission %}
             <!-- Useful Extensions Service -->
             <div class="service-card bg-white rounded-2xl p-8 border border-gray-200 cursor-pointer" 

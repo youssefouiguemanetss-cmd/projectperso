@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Subscription - TSS Services</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        .success-stat { border-left: 4px solid #10b981; }
+        .failed-stat { border-left: 4px solid #ef4444; }
+        .rate-stat { border-left: 4px solid #3b82f6; }
+        .total-stat { border-left: 4px solid #8b5cf6; }
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s ease;
+        }
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('services') }}" class="hover:bg-white/20 p-2 rounded-lg transition-colors">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </a>
+                    <div>
+                        <h1 class="text-2xl font-bold flex items-center">
+                            <i class="fas fa-newspaper mr-3"></i>
+                            News Subscription
+                        </h1>
+                        <p class="text-sm opacity-80">Automate website subscriptions and sign-ups</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="bg-white/20 px-3 py-2 rounded-lg">
+                        <i class="fas fa-user-circle mr-2"></i>
+                        <span class="font-medium">{{ current_user.name }}</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 max-w-6xl">
+        <div id="no-process-view">
+            <div class="card-glass rounded-2xl shadow-xl p-8 mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-play-circle text-purple-600 mr-3"></i>
+                    Start New Process
+                </h2>
+                
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-envelope mr-2 text-purple-600"></i>
+                            Email Address
+                        </label>
+                        <input type="email" id="email-input" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                               placeholder="Enter email for subscriptions">
+                        <p class="text-xs text-gray-500 mt-2">This email will be used for all newsletter/registration sign-ups</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-globe mr-2 text-purple-600"></i>
+                            Domains (one per line)
+                        </label>
+                        <textarea id="domains-input" rows="8"
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none"
+                                  placeholder="example.com&#10;another-site.com&#10;newsletter-site.org"></textarea>
+                        <p class="text-xs text-gray-500 mt-2">Enter one domain per line. The script will try to find and fill subscription forms.</p>
+                    </div>
+                </div>
+                
+                <div class="mt-8 flex justify-end">
+                    <button onclick="startProcess()" id="start-btn"
+                            class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-8 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-lg">
+                        <i class="fas fa-rocket mr-2"></i>
+                        Start Process
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="running-process-view" style="display: none;">
+            <div class="card-glass rounded-2xl shadow-xl p-8 mb-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-cog fa-spin text-purple-600 mr-3"></i>
+                        Process Running
+                    </h2>
+                    <button onclick="stopProcess()" id="stop-btn"
+                            class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-stop mr-2"></i>
+                        Stop Process
+                    </button>
+                </div>
+                
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <span id="progress-status">Processing...</span>
+                        <span id="progress-count">0 / 0</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                        <div id="progress-bar" class="progress-bar h-full rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="stat-card success-stat rounded-lg p-4">
+                        <div class="text-sm text-gray-600 mb-1">Successful</div>
+                        <div id="running-successful" class="text-2xl font-bold text-green-600">0</div>
+                    </div>
+                    <div class="stat-card failed-stat rounded-lg p-4">
+                        <div class="text-sm text-gray-600 mb-1">Failed</div>
+                        <div id="running-failed" class="text-2xl font-bold text-red-600">0</div>
+                    </div>
+                    <div class="stat-card rate-stat rounded-lg p-4">
+                        <div class="text-sm text-gray-600 mb-1">Success Rate</div>
+                        <div id="running-rate" class="text-2xl font-bold text-blue-600">0%</div>
+                    </div>
+                    <div class="stat-card total-stat rounded-lg p-4">
+                        <div class="text-sm text-gray-600 mb-1">Processed</div>
+                        <div id="running-total" class="text-2xl font-bold text-purple-600">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="completed-process-view" style="display: none;">
+            <div class="card-glass rounded-2xl shadow-xl p-8 mb-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-check-circle text-green-600 mr-3"></i>
+                        Process Results
+                    </h2>
+                    <button onclick="deleteProcess()" id="delete-btn"
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-trash mr-2"></i>
+                        Delete & Start New
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="stat-card success-stat rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-gray-600 mb-1">Successful Registrations</div>
+                                <div id="result-successful" class="text-3xl font-bold text-green-600">0</div>
+                            </div>
+                            <i class="fas fa-check-circle text-green-400 text-3xl opacity-50"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card failed-stat rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-gray-600 mb-1">Failed Registrations</div>
+                                <div id="result-failed" class="text-3xl font-bold text-red-600">0</div>
+                            </div>
+                            <i class="fas fa-times-circle text-red-400 text-3xl opacity-50"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card rate-stat rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-gray-600 mb-1">Success Rate</div>
+                                <div id="result-rate" class="text-3xl font-bold text-blue-600">0%</div>
+                            </div>
+                            <i class="fas fa-percentage text-blue-400 text-3xl opacity-50"></i>
+                        </div>
+                    </div>
+                    <div class="stat-card total-stat rounded-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-gray-600 mb-1">Total Processed</div>
+                                <div id="result-total" class="text-3xl font-bold text-purple-600">0</div>
+                            </div>
+                            <i class="fas fa-globe text-purple-400 text-3xl opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-envelope mr-2"></i>
+                        <span>Email used: </span>
+                        <span id="result-email" class="font-medium ml-1">-</span>
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600 mt-2">
+                        <i class="fas fa-clock mr-2"></i>
+                        <span>Completed at: </span>
+                        <span id="result-date" class="font-medium ml-1">-</span>
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600 mt-2">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <span>Status: </span>
+                        <span id="result-status" class="font-medium ml-1">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-full opacity-0 transition-all duration-300 z-50">
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        let statusInterval = null;
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            
+            toast.className = 'fixed bottom-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-50';
+            if (type === 'error') {
+                toast.classList.add('bg-red-600');
+            } else if (type === 'success') {
+                toast.classList.add('bg-green-600');
+            } else {
+                toast.classList.add('bg-gray-800');
+            }
+            
+            toast.classList.remove('translate-y-full', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-full', 'opacity-0');
+            }, 3000);
+        }
+
+        function showView(view) {
+            document.getElementById('no-process-view').style.display = view === 'no-process' ? 'block' : 'none';
+            document.getElementById('running-process-view').style.display = view === 'running' ? 'block' : 'none';
+            document.getElementById('completed-process-view').style.display = view === 'completed' ? 'block' : 'none';
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/news-subscription/status');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error(data.error);
+                    return;
+                }
+                
+                if (!data.has_process) {
+                    showView('no-process');
+                    if (statusInterval) {
+                        clearInterval(statusInterval);
+                        statusInterval = null;
+                    }
+                } else if (data.running) {
+                    showView('running');
+                    updateRunningStats(data);
+                    if (!statusInterval) {
+                        statusInterval = setInterval(checkStatus, 2000);
+                    }
+                } else {
+                    showView('completed');
+                    updateCompletedStats(data.data);
+                    if (statusInterval) {
+                        clearInterval(statusInterval);
+                        statusInterval = null;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+
+        function updateRunningStats(data) {
+            const progress = data.progress || 0;
+            const total = data.total || 0;
+            const successful = data.successful || 0;
+            const failed = data.failed || 0;
+            const processed = successful + failed;
+            const rate = processed > 0 ? Math.round((successful / processed) * 100) : 0;
+            
+            document.getElementById('progress-status').textContent = data.status || 'Processing...';
+            document.getElementById('progress-count').textContent = `${progress} / ${total}`;
+            document.getElementById('progress-bar').style.width = total > 0 ? `${(progress / total) * 100}%` : '0%';
+            
+            document.getElementById('running-successful').textContent = successful;
+            document.getElementById('running-failed').textContent = failed;
+            document.getElementById('running-rate').textContent = rate + '%';
+            document.getElementById('running-total').textContent = processed;
+        }
+
+        function updateCompletedStats(data) {
+            document.getElementById('result-successful').textContent = data.successful_registrations || 0;
+            document.getElementById('result-failed').textContent = data.failed_registrations || 0;
+            document.getElementById('result-rate').textContent = (data.success_rate || 0) + '%';
+            document.getElementById('result-total').textContent = data.total_domains_processed || 0;
+            document.getElementById('result-email').textContent = data.email_used || '-';
+            document.getElementById('result-date').textContent = data.created_at ? new Date(data.created_at).toLocaleString() : '-';
+            document.getElementById('result-status').textContent = data.status === 'completed' ? 'Completed Successfully' : (data.status === 'stopped' ? 'Stopped by User' : data.status);
+        }
+
+        async function startProcess() {
+            const email = document.getElementById('email-input').value.trim();
+            const domains = document.getElementById('domains-input').value.trim();
+            
+            if (!email) {
+                showToast('Please enter an email address.', 'error');
+                return;
+            }
+            
+            if (!email.includes('@')) {
+                showToast('Please enter a valid email address.', 'error');
+                return;
+            }
+            
+            if (!domains) {
+                showToast('Please enter at least one domain.', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('start-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Starting...';
+            
+            try {
+                const response = await fetch('/api/news-subscription/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, domains })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-rocket mr-2"></i>Start Process';
+                    return;
+                }
+                
+                showToast('Process started successfully!', 'success');
+                checkStatus();
+                
+            } catch (error) {
+                showToast('Failed to start process.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-rocket mr-2"></i>Start Process';
+            }
+        }
+
+        async function stopProcess() {
+            const btn = document.getElementById('stop-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Stopping...';
+            
+            try {
+                const response = await fetch('/api/news-subscription/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-stop mr-2"></i>Stop Process';
+                    return;
+                }
+                
+                showToast('Process stopped.', 'success');
+                setTimeout(checkStatus, 1000);
+                
+            } catch (error) {
+                showToast('Failed to stop process.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-stop mr-2"></i>Stop Process';
+            }
+        }
+
+        async function deleteProcess() {
+            if (!confirm('Are you sure you want to delete this process data?')) {
+                return;
+            }
+            
+            const btn = document.getElementById('delete-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Deleting...';
+            
+            try {
+                const response = await fetch('/api/news-subscription/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-trash mr-2"></i>Delete & Start New';
+                    return;
+                }
+                
+                showToast('Process deleted successfully.', 'success');
+                document.getElementById('email-input').value = '';
+                document.getElementById('domains-input').value = '';
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn').innerHTML = '<i class="fas fa-rocket mr-2"></i>Start Process';
+                checkStatus();
+                
+            } catch (error) {
+                showToast('Failed to delete process.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-trash mr-2"></i>Delete & Start New';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStatus();
+        });
+    </script>
+</body>
+</html>
