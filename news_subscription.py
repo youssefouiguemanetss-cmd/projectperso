@@ -2,13 +2,14 @@ import os
 import json
 import random
 import re
-import time
+import string
 import asyncio
 import threading
 import logging
 import traceback
 from datetime import datetime
 from faker import Faker
+import uuid
 
 USER_DATA_DIR = "news_subscription_data"
 os.makedirs(USER_DATA_DIR, exist_ok=True)
@@ -23,6 +24,8 @@ CONFIG = {
     'max_retries': 2,
     'navigation_timeout': 30000,
     'form_fill_delay': 800,
+    'captcha_wait': 20000,
+    'max_concurrent': 4,
     'user_agents': [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -43,23 +46,35 @@ def get_user_dir(username):
     os.makedirs(user_dir, exist_ok=True)
     return user_dir
 
-def get_user_data_file(username):
-    return os.path.join(get_user_dir(username), "process_data.json")
+def get_user_history_file(username):
+    return os.path.join(get_user_dir(username), "process_history.json")
 
-def get_user_process_status(username):
-    data_file = get_user_data_file(username)
-    if os.path.exists(data_file):
+def get_user_process_history(username):
+    history_file = get_user_history_file(username)
+    if os.path.exists(history_file):
         try:
-            with open(data_file, 'r', encoding='utf-8') as f:
+            with open(history_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except:
-            return None
-    return None
+            return []
+    return []
 
-def save_user_process_data(username, data):
-    data_file = get_user_data_file(username)
-    with open(data_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
+def save_user_process_history(username, history):
+    history_file = get_user_history_file(username)
+    with open(history_file, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=2)
+
+def add_process_to_history(username, process_data):
+    history = get_user_process_history(username)
+    process_data['id'] = str(uuid.uuid4())
+    history.insert(0, process_data)
+    save_user_process_history(username, history)
+
+def delete_process_from_history(username, process_id):
+    history = get_user_process_history(username)
+    history = [p for p in history if p.get('id') != process_id]
+    save_user_process_history(username, history)
+    return True
 
 def is_process_running(username):
     return username in user_processes and user_processes[username].get('running', False)
@@ -70,17 +85,31 @@ def stop_user_process(username):
         user_processes[username]['status'] = 'Stopped by user'
     return True
 
-def delete_user_process(username):
-    user_dir = get_user_dir(username)
-    if os.path.exists(user_dir):
-        import shutil
-        shutil.rmtree(user_dir)
-    if username in user_processes:
-        del user_processes[username]
-    return True
+def validate_domain(domain):
+    domain = domain.strip()
+    if not domain:
+        return None, "Empty domain"
+    
+    if domain.startswith(('http://', 'https://')):
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(domain)
+            if parsed.netloc:
+                return domain, None
+        except:
+            pass
+        return None, "Invalid URL format"
+    
+    domain_pattern = re.compile(
+        r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+    )
+    
+    if domain_pattern.match(domain):
+        return f"https://{domain}", None
+    
+    return None, f"Invalid domain format: {domain}"
 
 def generate_password(length=12):
-    import string
     uppercase = string.ascii_uppercase
     lowercase = string.ascii_lowercase
     digits = string.digits
@@ -99,6 +128,25 @@ def generate_password(length=12):
     
     random.shuffle(password)
     return ''.join(password)
+
+async def check_domain_relevance(page):
+    try:
+        await page.wait_for_timeout(2000)
+        page_text = (await page.inner_text('body', timeout=8000)).lower()
+        
+        required_keywords = [
+            'create account', 'login', 'log in', 'sign in', 'sign up',
+            'signup', 'free trial', 'register', 'registration'
+        ]
+        
+        for keyword in required_keywords:
+            if keyword in page_text:
+                return True
+        
+        return False
+        
+    except Exception as e:
+        return False
 
 async def is_registration_related(text, href=None):
     if not text or len(text.strip()) < 2:
@@ -153,6 +201,7 @@ async def get_element_info(element):
             ('aria-label', lambda: element.get_attribute('aria-label')),
             ('title', lambda: element.get_attribute('title')),
             ('alt', lambda: element.get_attribute('alt')),
+            ('data-text', lambda: element.get_attribute('data-text')),
             ('placeholder', lambda: element.get_attribute('placeholder')),
         ]
         
@@ -175,26 +224,6 @@ async def get_element_info(element):
         
     except Exception as e:
         return None, None
-
-async def check_domain_relevance(page):
-    try:
-        await page.wait_for_timeout(2000)
-        page_text = (await page.inner_text('body', timeout=8000)).lower()
-        
-        required_keywords = [
-            'create account', 'login', 'log in', 'sign in', 'sign up',
-            'signup', 'free trial', 'register', 'registration', 'subscribe',
-            'newsletter', 'email'
-        ]
-        
-        for keyword in required_keywords:
-            if keyword in page_text:
-                return True
-        
-        return False
-        
-    except Exception as e:
-        return False
 
 async def safe_click(element, page, timeout=5000, force=False, is_check=False):
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -225,7 +254,120 @@ async def safe_click(element, page, timeout=5000, force=False, is_check=False):
     
     return page, False
 
-async def find_registration_elements(page):
+async def handle_popup_with_email_detection(page, email):
+    try:
+        await page.wait_for_timeout(2000)
+        
+        popup_selectors = [
+            '[role="dialog"]:visible',
+            '.modal:visible',
+            '.popup:visible',
+            '[class*="modal" i]:visible',
+            '[class*="popup" i]:visible',
+            '[id*="modal" i]:visible',
+            '[id*="popup" i]:visible',
+            '.overlay:visible'
+        ]
+        
+        popup = None
+        for selector in popup_selectors:
+            try:
+                popup = await page.query_selector(selector)
+                if popup and await popup.is_visible():
+                    break
+            except:
+                continue
+        
+        if not popup:
+            return False, page
+        
+        email_inputs = await popup.query_selector_all(
+            'input[type="email"]:visible, input[name*="email" i]:visible, '
+            'input[placeholder*="email" i]:visible'
+        )
+        
+        has_email_field = False
+        for email_input in email_inputs:
+            if await email_input.is_visible():
+                has_email_field = True
+                break
+        
+        if not has_email_field:
+            close_selectors = [
+                'button[aria-label*="close" i]:visible',
+                'button[title*="close" i]:visible',
+                '[class*="close" i]:visible',
+                'button:has-text("×"):visible',
+                'button:has-text("Close"):visible',
+                '[role="button"][aria-label*="close" i]:visible'
+            ]
+            
+            for selector in close_selectors:
+                try:
+                    close_btn = await popup.query_selector(selector)
+                    if close_btn and await close_btn.is_visible():
+                        page, _ = await safe_click(close_btn, page)
+                        await page.wait_for_timeout(1000)
+                        return True, page
+                except:
+                    continue
+            
+            try:
+                await page.keyboard.press('Escape')
+                await page.wait_for_timeout(1000)
+                return True, page
+            except:
+                pass
+        
+        else:
+            fake_local = Faker()
+            popup_email = email
+            
+            all_inputs = await popup.query_selector_all('input:visible, textarea:visible')
+            
+            for input_elem in all_inputs:
+                try:
+                    input_type = (await input_elem.get_attribute('type') or 'text').lower()
+                    input_name = (await input_elem.get_attribute('name') or '').lower()
+                    input_placeholder = (await input_elem.get_attribute('placeholder') or '').lower()
+                    field_context = f"{input_name} {input_placeholder}".lower()
+                    
+                    if input_type == 'email' or 'email' in field_context:
+                        await input_elem.fill(popup_email)
+                    elif 'name' in field_context and 'email' not in field_context:
+                        await input_elem.fill(fake_local.name())
+                    elif input_type == 'text':
+                        await input_elem.fill(fake_local.name())
+                    
+                    await page.wait_for_timeout(500)
+                except:
+                    continue
+            
+            submit_selectors = [
+                'button[type="submit"]:visible',
+                'input[type="submit"]:visible',
+                'button:has-text("Submit"):visible',
+                'button:has-text("Subscribe"):visible',
+                'button:has-text("Continue"):visible',
+                'button:has-text("Sign up"):visible'
+            ]
+            
+            for selector in submit_selectors:
+                try:
+                    submit_btn = await popup.query_selector(selector)
+                    if submit_btn and await submit_btn.is_visible():
+                        page, _ = await safe_click(submit_btn, page)
+                        await page.wait_for_timeout(2000)
+                        return True, page
+                except:
+                    continue
+        
+        return False, page
+        
+    except Exception as e:
+        return False, page
+
+async def find_registration_elements_comprehensive(page):
     try:
         await page.wait_for_load_state('domcontentloaded', timeout=10000)
         await page.wait_for_timeout(3000)
@@ -236,6 +378,7 @@ async def find_registration_elements(page):
             'a:has-text("Register"):visible',
             'a:has-text("Sign Up"):visible',
             'a:has-text("Sign up"):visible',
+            'a:has-text("Create Account"):visible',
             'a:has-text("Subscribe"):visible',
             'a:has-text("Newsletter"):visible',
             'button:has-text("Register"):visible',
@@ -245,7 +388,11 @@ async def find_registration_elements(page):
             'button:has-text("Get Started"):visible',
             'a[href*="register" i]:visible',
             'a[href*="signup" i]:visible',
+            'a[href*="sign-up" i]:visible',
             'a[href*="subscribe" i]:visible',
+            'a[href*="join" i]:visible',
+            '[class*="register" i]:visible',
+            '[class*="signup" i]:visible',
             'input[type="submit"][value*="register" i]:visible',
             'input[type="submit"][value*="sign up" i]:visible',
             'input[type="submit"][value*="subscribe" i]:visible'
@@ -277,20 +424,36 @@ async def find_registration_elements(page):
                         if text and await is_registration_related(text, href):
                             registration_elements.append((element, text, href or ''))
                             
-                            if len(registration_elements) >= 6:
+                            if len(registration_elements) >= 8:
                                 break
                     except asyncio.TimeoutError:
                         continue
                     except Exception as e:
                         continue
                         
-                if len(registration_elements) >= 6:
+                if len(registration_elements) >= 8:
                     break
                     
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
                 continue
+        
+        def get_priority(item):
+            text = item[1].lower()
+            href = item[2].lower() if item[2] else ''
+            
+            if text.strip() in ['register', 'sign up', 'signup', 'subscribe']:
+                return 0
+            elif any(x in text for x in ['register', 'sign up', 'create account', 'subscribe']):
+                return 1
+            elif any(x in text for x in ['join', 'get started', 'newsletter']):
+                return 2
+            elif any(x in href for x in ['register', 'signup', 'join', 'subscribe']):
+                return 3
+            return 4
+        
+        registration_elements.sort(key=get_priority)
         
         return registration_elements[:6]
         
@@ -304,7 +467,7 @@ async def smart_form_fill(page, email):
         except Exception as e:
             pass
         
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(5000)
         
         username = fake.user_name().lower() + str(random.randint(100, 999))
         password = generate_password(16)
@@ -402,9 +565,36 @@ async def smart_form_fill(page, email):
                                 await element.fill(phone)
                                 filled = True
                             
+                            elif 'age' in field_context:
+                                age = str(random.randint(18, 65))
+                                await element.fill(age)
+                                filled = True
+                            elif 'birth' in field_context or 'dob' in field_context:
+                                birth_date = fake.date_of_birth(minimum_age=18, maximum_age=65).strftime('%m/%d/%Y')
+                                await element.fill(birth_date)
+                                filled = True
+                            
                             elif 'company' in field_context or 'organization' in field_context:
                                 company = fake.company()
                                 await element.fill(company)
+                                filled = True
+                            
+                            elif 'title' in field_context or 'position' in field_context:
+                                title = fake.job()
+                                await element.fill(title)
+                                filled = True
+                            
+                            elif 'address' in field_context:
+                                address = fake.address().replace('\n', ', ')
+                                await element.fill(address)
+                                filled = True
+                            elif 'city' in field_context:
+                                city = fake.city()
+                                await element.fill(city)
+                                filled = True
+                            elif 'zip' in field_context or 'postal' in field_context:
+                                zip_code = fake.zipcode()
+                                await element.fill(zip_code)
                                 filled = True
                             
                             elif input_type == 'text' and not filled:
@@ -424,7 +614,7 @@ async def smart_form_fill(page, email):
                     
                     if filled:
                         filled_count += 1
-                        await page.wait_for_timeout(500)
+                        await page.wait_for_timeout(800)
                     
                 except Exception as e:
                     continue
@@ -447,6 +637,18 @@ async def smart_form_fill(page, email):
                             filled_count += 1
                 except Exception as e:
                     pass
+            
+            radio_groups = {}
+            radios = await page.query_selector_all('input[type="radio"]:visible')
+            for radio in radios:
+                try:
+                    radio_name = await radio.get_attribute('name')
+                    if radio_name and radio_name not in radio_groups:
+                        page, _ = await safe_click(radio, page, is_check=True)
+                        radio_groups[radio_name] = True
+                        filled_count += 1
+                except Exception as e:
+                    pass
                     
         except Exception as e:
             pass
@@ -461,6 +663,8 @@ async def smart_form_submit(page):
         submit_selectors = [
             'button:has-text("Register"):visible',
             'button:has-text("Sign Up"):visible',
+            'button:has-text("Sign up"):visible',
+            'button:has-text("Create Account"):visible',
             'button:has-text("Subscribe"):visible',
             'button:has-text("Join"):visible',
             'input[type="submit"]:visible',
@@ -468,6 +672,8 @@ async def smart_form_submit(page):
             'input[value*="register" i]:visible',
             'input[value*="sign up" i]:visible',
             'input[value*="subscribe" i]:visible',
+            'input[value*="create" i]:visible',
+            'input[value*="join" i]:visible',
             'button:has-text("Submit"):visible',
             'button:has-text("Continue"):visible',
             'button:has-text("Get Started"):visible',
@@ -503,6 +709,7 @@ async def smart_form_submit(page):
             return False, page
         
         await page.wait_for_timeout(5000)
+        await page.wait_for_timeout(3000)
         
         new_url = page.url
         new_title = await page.title()
@@ -551,116 +758,7 @@ async def smart_form_submit(page):
     except Exception as e:
         return False, page
 
-async def handle_popup_with_email(page, email):
-    try:
-        await page.wait_for_timeout(2000)
-        
-        popup_selectors = [
-            '[role="dialog"]:visible',
-            '.modal:visible',
-            '.popup:visible',
-            '[class*="modal" i]:visible',
-            '[class*="popup" i]:visible',
-            '[id*="modal" i]:visible',
-            '[id*="popup" i]:visible',
-            '.overlay:visible'
-        ]
-        
-        popup = None
-        for selector in popup_selectors:
-            try:
-                popup = await page.query_selector(selector)
-                if popup and await popup.is_visible():
-                    break
-            except:
-                continue
-        
-        if not popup:
-            return False, page
-        
-        email_inputs = await popup.query_selector_all(
-            'input[type="email"]:visible, input[name*="email" i]:visible, '
-            'input[placeholder*="email" i]:visible'
-        )
-        
-        has_email_field = False
-        for email_input in email_inputs:
-            if await email_input.is_visible():
-                has_email_field = True
-                break
-        
-        if not has_email_field:
-            close_selectors = [
-                'button[aria-label*="close" i]:visible',
-                'button[title*="close" i]:visible',
-                '[class*="close" i]:visible',
-                'button:has-text("×"):visible',
-                'button:has-text("Close"):visible',
-            ]
-            
-            for selector in close_selectors:
-                try:
-                    close_btn = await popup.query_selector(selector)
-                    if close_btn and await close_btn.is_visible():
-                        page, _ = await safe_click(close_btn, page)
-                        await page.wait_for_timeout(1000)
-                        return True, page
-                except:
-                    continue
-            
-            try:
-                await page.keyboard.press('Escape')
-                await page.wait_for_timeout(1000)
-                return True, page
-            except:
-                pass
-        
-        else:
-            all_inputs = await popup.query_selector_all('input:visible, textarea:visible')
-            
-            for input_elem in all_inputs:
-                try:
-                    input_type = (await input_elem.get_attribute('type') or 'text').lower()
-                    input_name = (await input_elem.get_attribute('name') or '').lower()
-                    input_placeholder = (await input_elem.get_attribute('placeholder') or '').lower()
-                    field_context = f"{input_name} {input_placeholder}".lower()
-                    
-                    if input_type == 'email' or 'email' in field_context:
-                        await input_elem.fill(email)
-                    elif 'name' in field_context and 'email' not in field_context:
-                        await input_elem.fill(fake.name())
-                    elif input_type == 'text':
-                        await input_elem.fill(fake.name())
-                    
-                    await page.wait_for_timeout(500)
-                except:
-                    continue
-            
-            submit_selectors = [
-                'button[type="submit"]:visible',
-                'input[type="submit"]:visible',
-                'button:has-text("Submit"):visible',
-                'button:has-text("Subscribe"):visible',
-                'button:has-text("Continue"):visible',
-                'button:has-text("Sign up"):visible'
-            ]
-            
-            for selector in submit_selectors:
-                try:
-                    submit_btn = await popup.query_selector(selector)
-                    if submit_btn and await submit_btn.is_visible():
-                        page, _ = await safe_click(submit_btn, page)
-                        await page.wait_for_timeout(2000)
-                        return True, page
-                except:
-                    continue
-        
-        return False, page
-        
-    except Exception as e:
-        return False, page
-
-async def registration_workflow(page, email, domain):
+async def comprehensive_registration_workflow(page, email, domain):
     try:
         max_workflow_steps = 2
         current_step = 0
@@ -695,7 +793,7 @@ async def registration_workflow(page, email, domain):
             
             if not step_progress:
                 try:
-                    popup_handled, page = await handle_popup_with_email(page, email)
+                    popup_handled, page = await handle_popup_with_email_detection(page, email)
                     
                     forms = await page.query_selector_all('form:visible')
                     if forms and forms_found < len(forms):
@@ -706,7 +804,7 @@ async def registration_workflow(page, email, domain):
                             if submission_result:
                                 return True, page
                     
-                    reg_elements = await find_registration_elements(page)
+                    reg_elements = await find_registration_elements_comprehensive(page)
                     
                     if reg_elements:
                         step_progress = True
@@ -724,17 +822,19 @@ async def registration_workflow(page, email, domain):
                                 
                                 new_url = page.url
                                 if new_url != current_url:
-                                    await page.wait_for_timeout(2000)
-                                    new_forms = await page.query_selector_all('form:visible')
-                                    if new_forms and len(new_forms) > forms_found:
-                                        fields_filled_count = await smart_form_fill(page, email)
-                                        fields_filled += fields_filled_count
-                                        if fields_filled_count > 0:
-                                            submission_result, page = await smart_form_submit(page)
-                                            if submission_result:
-                                                return True, page
-                                        break
-                                    
+                                    break
+                                
+                                await page.wait_for_timeout(2000)
+                                new_forms = await page.query_selector_all('form:visible')
+                                if new_forms and len(new_forms) > forms_found:
+                                    fields_filled_count = await smart_form_fill(page, email)
+                                    fields_filled += fields_filled_count
+                                    if fields_filled_count > 0:
+                                        submission_result, page = await smart_form_submit(page)
+                                        if submission_result:
+                                            return True, page
+                                    break
+                                
                             except Exception as e:
                                 continue
                     
@@ -752,7 +852,7 @@ async def registration_workflow(page, email, domain):
     except Exception as e:
         return False, page
 
-async def process_domain(page, domain, email):
+async def process_domain_with_retry(page, domain, email):
     url = domain if domain.startswith(('http://', 'https://')) else f"https://{domain}"
     
     max_retries = CONFIG['max_retries']
@@ -782,9 +882,9 @@ async def process_domain(page, domain, email):
                     return False
                 relevance_checked = True
             
-            await handle_popup_with_email(page, email)
+            await handle_popup_with_email_detection(page, email)
             
-            success, page = await registration_workflow(page, email, domain)
+            success, page = await comprehensive_registration_workflow(page, email, domain)
             
             if success:
                 return True
@@ -802,126 +902,175 @@ async def process_domain(page, domain, email):
     
     return False
 
+async def process_single_domain(p, domain, email, username, results, current_domains):
+    domain_display = domain[:50] + '...' if len(domain) > 50 else domain
+    current_domains.add(domain_display)
+    
+    browser = None
+    try:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--disable-web-security',
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-software-rasterizer',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-extensions',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--disable-translate',
+                '--no-first-run',
+                '--no-default-browser-check',
+                '--window-size=1920,1080',
+            ],
+            slow_mo=500
+        )
+        
+        context = await browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            user_agent=random.choice(CONFIG['user_agents']),
+            java_script_enabled=True,
+            accept_downloads=False,
+            ignore_https_errors=True,
+            bypass_csp=True,
+            extra_http_headers={
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        )
+        
+        page = await context.new_page()
+        
+        try:
+            success = await process_domain_with_retry(page, domain, email)
+            results['completed'] += 1
+            if success:
+                results['successful'] += 1
+            else:
+                results['failed'] += 1
+        except Exception as e:
+            results['completed'] += 1
+            results['failed'] += 1
+        finally:
+            await page.close()
+            await context.close()
+            
+    except Exception as e:
+        results['completed'] += 1
+        results['failed'] += 1
+    finally:
+        if browser:
+            try:
+                await browser.close()
+            except:
+                pass
+        current_domains.discard(domain_display)
+
 async def run_subscription_process_async(username, email, domains):
     from playwright.async_api import async_playwright
+    
+    valid_domains = []
+    invalid_count = 0
+    
+    for domain in domains:
+        validated_url, error = validate_domain(domain)
+        if validated_url:
+            valid_domains.append(validated_url)
+        else:
+            invalid_count += 1
+    
+    current_domains = set()
+    results = {
+        'successful': 0,
+        'failed': invalid_count,
+        'completed': 0
+    }
     
     user_processes[username] = {
         'running': True,
         'progress': 0,
-        'total': len(domains),
+        'total': len(valid_domains),
         'status': 'Starting...',
         'error': None,
         'successful': 0,
-        'failed': 0
+        'failed': invalid_count,
+        'current_domains': [],
+        'invalid_domains': invalid_count
     }
     
     try:
-        successful_registrations = 0
-        failed_registrations = 0
-        
-        user_processes[username]['status'] = 'Starting browser...'
+        user_processes[username]['status'] = 'Processing domains...'
         
         async with async_playwright() as p:
-            for i, domain in enumerate(domains):
-                if not user_processes.get(username, {}).get('running', False):
-                    break
-                
-                user_processes[username]['status'] = f'Processing: {domain}'
-                user_processes[username]['progress'] = i
-                
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[
-                        '--disable-blink-features=AutomationControlled',
-                        '--disable-web-security',
-                        '--no-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--disable-gpu',
-                        '--disable-software-rasterizer',
-                        '--disable-extensions',
-                        '--no-first-run',
-                        '--window-size=1920,1080',
-                    ],
-                    slow_mo=300
-                )
-                
-                context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent=random.choice(CONFIG['user_agents']),
-                    java_script_enabled=True,
-                    accept_downloads=False,
-                    ignore_https_errors=True,
-                    bypass_csp=True,
-                    extra_http_headers={
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                        'Cache-Control': 'no-cache',
-                    }
-                )
-                
-                page = await context.new_page()
-                
-                try:
-                    success = await process_domain(page, domain, email)
-                    if success:
-                        successful_registrations += 1
-                    else:
-                        failed_registrations += 1
-                        
-                except Exception as e:
-                    failed_registrations += 1
-                finally:
-                    await page.close()
-                    await context.close()
-                    await browser.close()
-                
-                user_processes[username]['successful'] = successful_registrations
-                user_processes[username]['failed'] = failed_registrations
-                
-                if i < len(domains) - 1 and user_processes.get(username, {}).get('running', False):
-                    delay = random.randint(*CONFIG['wait_between_domains'])
-                    user_processes[username]['status'] = f'Waiting before next domain...'
-                    await asyncio.sleep(delay / 1000)
+            semaphore = asyncio.Semaphore(CONFIG['max_concurrent'])
+            
+            async def process_with_semaphore(domain):
+                async with semaphore:
+                    if not user_processes.get(username, {}).get('running', False):
+                        return
+                    await process_single_domain(p, domain, email, username, results, current_domains)
+                    
+                    user_processes[username]['progress'] = results['completed']
+                    user_processes[username]['successful'] = results['successful']
+                    user_processes[username]['failed'] = results['failed']
+                    user_processes[username]['current_domains'] = list(current_domains)
+                    
+                    processed = results['completed']
+                    total = len(valid_domains)
+                    user_processes[username]['status'] = f'Processing... ({processed}/{total})'
+            
+            tasks = [process_with_semaphore(domain) for domain in valid_domains]
+            await asyncio.gather(*tasks)
         
-        total_processed = successful_registrations + failed_registrations
-        success_rate = (successful_registrations / total_processed * 100) if total_processed > 0 else 0
+        total_processed = results['successful'] + results['failed']
+        success_rate = (results['successful'] / total_processed * 100) if total_processed > 0 else 0
         
         process_data = {
             'status': 'completed' if user_processes.get(username, {}).get('running', False) else 'stopped',
             'created_at': datetime.now().isoformat(),
-            'successful_registrations': successful_registrations,
-            'failed_registrations': failed_registrations,
+            'successful_registrations': results['successful'],
+            'failed_registrations': results['failed'],
             'success_rate': round(success_rate, 1),
             'total_domains_processed': total_processed,
-            'email_used': email
+            'email_used': email,
+            'invalid_domains': invalid_count
         }
         
-        save_user_process_data(username, process_data)
+        add_process_to_history(username, process_data)
         
-        user_processes[username]['progress'] = len(domains)
+        user_processes[username]['progress'] = len(valid_domains)
         user_processes[username]['status'] = 'Completed' if user_processes[username].get('running', False) else 'Stopped'
         user_processes[username]['running'] = False
+        user_processes[username]['current_domains'] = []
         
     except Exception as e:
         logging.error(f"Error in subscription process for {username}: {e}")
         user_processes[username]['error'] = str(e)
         user_processes[username]['running'] = False
         
-        total_processed = user_processes[username].get('successful', 0) + user_processes[username].get('failed', 0)
-        success_rate = (user_processes[username].get('successful', 0) / total_processed * 100) if total_processed > 0 else 0
+        total_processed = results.get('successful', 0) + results.get('failed', 0)
+        success_rate = (results.get('successful', 0) / total_processed * 100) if total_processed > 0 else 0
         
         process_data = {
             'status': 'error',
             'created_at': datetime.now().isoformat(),
-            'successful_registrations': user_processes[username].get('successful', 0),
-            'failed_registrations': user_processes[username].get('failed', 0),
+            'successful_registrations': results.get('successful', 0),
+            'failed_registrations': results.get('failed', 0),
             'success_rate': round(success_rate, 1),
             'total_domains_processed': total_processed,
             'email_used': email,
             'error': str(e)
         }
         
-        save_user_process_data(username, process_data)
+        add_process_to_history(username, process_data)
 
 def run_subscription_process(username, email, domains):
     def run_async_in_thread():

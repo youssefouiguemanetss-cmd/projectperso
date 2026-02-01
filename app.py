@@ -3149,32 +3149,37 @@ def news_subscription_status():
     if not current_user.has_news_subscription_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    from news_subscription import get_user_process_status, is_process_running, user_processes
+    from news_subscription import get_user_process_history, is_process_running, user_processes
     
     username = current_user.username
     
     running_status = user_processes.get(username, {})
     if running_status.get('running'):
         return jsonify({
-            'has_process': True,
             'running': True,
             'progress': running_status.get('progress', 0),
             'total': running_status.get('total', 0),
             'status': running_status.get('status', 'Processing...'),
             'error': running_status.get('error'),
             'successful': running_status.get('successful', 0),
-            'failed': running_status.get('failed', 0)
+            'failed': running_status.get('failed', 0),
+            'current_domains': running_status.get('current_domains', [])
         })
     
-    saved_data = get_user_process_status(username)
-    if saved_data:
-        return jsonify({
-            'has_process': True,
-            'running': False,
-            'data': saved_data
-        })
+    return jsonify({'running': False})
+
+@app.route('/api/news-subscription/history')
+@login_required
+def news_subscription_history():
+    if not current_user.has_news_subscription_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
     
-    return jsonify({'has_process': False, 'running': False})
+    from news_subscription import get_user_process_history
+    
+    username = current_user.username
+    history = get_user_process_history(username)
+    
+    return jsonify({'history': history})
 
 @app.route('/api/news-subscription/start', methods=['POST'])
 @login_required
@@ -3182,16 +3187,12 @@ def news_subscription_start():
     if not current_user.has_news_subscription_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    from news_subscription import is_process_running, get_user_process_status, run_subscription_process
+    from news_subscription import is_process_running, run_subscription_process
     
     username = current_user.username
     
     if is_process_running(username):
-        return jsonify({'error': 'A process is already running. Please stop it first.'}), 400
-    
-    existing_process = get_user_process_status(username)
-    if existing_process:
-        return jsonify({'error': 'You have an existing process. Please delete it first before starting a new one.'}), 400
+        return jsonify({'error': 'A process is already running. Please wait for it to complete or stop it first.'}), 400
     
     data = request.get_json()
     email = data.get('email', '').strip()
@@ -3234,14 +3235,16 @@ def news_subscription_delete():
     if not current_user.has_news_subscription_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    from news_subscription import delete_user_process, is_process_running
+    from news_subscription import delete_process_from_history
     
     username = current_user.username
+    data = request.get_json()
+    process_id = data.get('process_id', '')
     
-    if is_process_running(username):
-        return jsonify({'error': 'Cannot delete while a process is running. Please stop it first.'}), 400
+    if not process_id:
+        return jsonify({'error': 'Process ID is required.'}), 400
     
-    delete_user_process(username)
+    delete_process_from_history(username, process_id)
     return jsonify({'success': True, 'message': 'Process deleted successfully'})
 
 
