@@ -189,3 +189,7 @@
 [x] 138. Verified application running successfully - workflow status: RUNNING, gunicorn listening on port 5000
 [x] 139. Screenshot confirmed TSS Gmail Access login page displays correctly
 [x] 140. Import migration to Replit environment completed - Feb 03, 2026 - all items marked as done
+[x] 141. News Subscription: Added pause/resume functionality with JSON persistence
+[x] 142. News Subscription: Supported multiple concurrent processes for users with "infinity-process" permission
+[x] 143. News Subscription: Implemented global logging of successful domains to all_successfully_domain.txt
+[x] 144. News Subscription: Redesigned dashboard UI to support managing multiple independent processes

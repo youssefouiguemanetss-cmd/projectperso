@@ -76,59 +76,7 @@
     </header>
 
     <main class="container mx-auto px-4 py-8 max-w-6xl">
-        <div id="running-process-view" style="display: none;">
-            <div class="card-glass rounded-2xl shadow-xl p-8 mb-8">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800">
-                        <i class="fas fa-cog fa-spin text-purple-600 mr-3"></i>
-                        Process Running
-                    </h2>
-                    <button onclick="stopProcess()" id="stop-btn"
-                            class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                        <i class="fas fa-stop mr-2"></i>
-                        Stop Process
-                    </button>
-                </div>
-                
-                <div class="mb-6">
-                    <div class="flex justify-between text-sm text-gray-600 mb-2">
-                        <span id="progress-status">Processing...</span>
-                        <span id="progress-count">0 / 0</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                        <div id="progress-bar" class="progress-bar h-full rounded-full" style="width: 0%"></div>
-                    </div>
-                </div>
-                
-                <div id="current-domains-section" class="mb-6">
-                    <h3 class="text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-globe text-purple-600 mr-2"></i>
-                        Currently Processing (up to 4):
-                    </h3>
-                    <div id="current-domains" class="flex flex-wrap gap-2">
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="stat-card success-stat rounded-lg p-4">
-                        <div class="text-sm text-gray-600 mb-1">Successful</div>
-                        <div id="running-successful" class="text-2xl font-bold text-green-600">0</div>
-                    </div>
-                    <div class="stat-card failed-stat rounded-lg p-4">
-                        <div class="text-sm text-gray-600 mb-1">Failed</div>
-                        <div id="running-failed" class="text-2xl font-bold text-red-600">0</div>
-                    </div>
-                    <div class="stat-card rate-stat rounded-lg p-4">
-                        <div class="text-sm text-gray-600 mb-1">Success Rate</div>
-                        <div id="running-rate" class="text-2xl font-bold text-blue-600">0%</div>
-                    </div>
-                    <div class="stat-card total-stat rounded-lg p-4">
-                        <div class="text-sm text-gray-600 mb-1">Processed</div>
-                        <div id="running-total" class="text-2xl font-bold text-purple-600">0</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div id="processes-container"></div>
 
         <div id="start-process-view">
             <div class="card-glass rounded-2xl shadow-xl p-8 mb-8">
@@ -228,19 +176,18 @@
                 const response = await fetch('/api/news-subscription/status');
                 const data = await response.json();
                 
-                if (data.error) {
-                    console.error(data.error);
-                    return;
-                }
+                if (data.error) return;
                 
-                if (data.running) {
-                    showView(true);
-                    updateRunningStats(data);
-                    if (!statusInterval) {
-                        statusInterval = setInterval(checkStatus, 1500);
-                    }
+                const container = document.getElementById('processes-container');
+                const startView = document.getElementById('start-process-view');
+                
+                if (data.processes && data.processes.length > 0) {
+                    if (!data.infinity) startView.style.display = 'none';
+                    container.innerHTML = data.processes.map(p => renderProcess(p)).join('');
+                    if (!statusInterval) statusInterval = setInterval(checkStatus, 1500);
                 } else {
-                    showView(false);
+                    container.innerHTML = '';
+                    startView.style.display = 'block';
                     if (statusInterval) {
                         clearInterval(statusInterval);
                         statusInterval = null;
@@ -248,38 +195,74 @@
                     }
                 }
             } catch (error) {
-                console.error('Error checking status:', error);
+                console.error('Error:', error);
             }
         }
 
-        function updateRunningStats(data) {
-            const progress = data.progress || 0;
-            const total = data.total || 0;
-            const successful = data.successful || 0;
-            const failed = data.failed || 0;
-            const processed = successful + failed;
-            const rate = processed > 0 ? Math.round((successful / processed) * 100) : 0;
-            const currentDomains = data.current_domains || [];
+        function renderProcess(p) {
+            const processed = p.successful + p.failed;
+            const rate = processed > 0 ? Math.round((p.successful / processed) * 100) : 0;
+            const progress = p.total > 0 ? (p.progress / p.total) * 100 : 0;
             
-            document.getElementById('progress-status').textContent = data.status || 'Processing...';
-            document.getElementById('progress-count').textContent = `${progress} / ${total}`;
-            document.getElementById('progress-bar').style.width = total > 0 ? `${(progress / total) * 100}%` : '0%';
-            
-            document.getElementById('running-successful').textContent = successful;
-            document.getElementById('running-failed').textContent = failed;
-            document.getElementById('running-rate').textContent = rate + '%';
-            document.getElementById('running-total').textContent = processed;
-            
-            const domainsContainer = document.getElementById('current-domains');
-            if (currentDomains.length > 0) {
-                domainsContainer.innerHTML = currentDomains.map(domain => 
-                    `<span class="domain-badge bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
-                        <i class="fas fa-spinner fa-spin mr-1"></i>${domain}
-                    </span>`
-                ).join('');
-            } else {
-                domainsContainer.innerHTML = '<span class="text-gray-500 text-sm">Waiting for domains...</span>';
-            }
+            return `
+                <div class="card-glass rounded-2xl shadow-xl p-8 mb-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">
+                            <i class="fas ${p.paused ? 'fa-pause-circle text-yellow-500' : 'fa-cog fa-spin text-purple-600'} mr-3"></i>
+                            Process ${p.id} ${p.paused ? '(Paused)' : ''}
+                        </h2>
+                        <div class="flex space-x-2">
+                            ${p.paused ? 
+                                `<button onclick="resumeProcess('${p.id}')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors">Resume</button>` :
+                                `<button onclick="pauseProcess('${p.id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors">Pause</button>`
+                            }
+                            <button onclick="stopProcess('${p.id}')" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors">Stop</button>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>${p.status}</span>
+                            <span>${p.progress} / ${p.total}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                            <div class="progress-bar h-full rounded-full" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="stat-card success-stat rounded-lg p-4"><div>Successful</div><div class="text-2xl font-bold text-green-600">${p.successful}</div></div>
+                        <div class="stat-card failed-stat rounded-lg p-4"><div>Failed</div><div class="text-2xl font-bold text-red-600">${p.failed}</div></div>
+                        <div class="stat-card rate-stat rounded-lg p-4"><div>Rate</div><div class="text-2xl font-bold text-blue-600">${rate}%</div></div>
+                        <div class="stat-card total-stat rounded-lg p-4"><div>Processed</div><div class="text-2xl font-bold text-purple-600">${processed}</div></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function pauseProcess(pid) {
+            await fetch('/api/news-subscription/pause', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ process_id: pid })
+            });
+            checkStatus();
+        }
+
+        async function resumeProcess(pid) {
+            await fetch('/api/news-subscription/resume', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ process_id: pid })
+            });
+            checkStatus();
+        }
+
+        async function stopProcess(pid = 'default') {
+            await fetch('/api/news-subscription/stop', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ process_id: pid })
+            });
+            setTimeout(() => { checkStatus(); loadHistory(); }, 1000);
         }
 
         async function loadHistory() {

@@ -14,6 +14,53 @@ import uuid
 USER_DATA_DIR = "news_subscription_data"
 os.makedirs(USER_DATA_DIR, exist_ok=True)
 
+SUCCESS_DOMAINS_FILE = "all_successfully_domain.txt"
+
+def add_successful_domain(domain):
+    """Add a domain to the global successful domains list."""
+    try:
+        domain = domain.lower().strip()
+        if domain.startswith('https://'): domain = domain[8:]
+        if domain.startswith('http://'): domain = domain[7:]
+        
+        # Check if already exists to avoid duplicates
+        existing = set()
+        if os.path.exists(SUCCESS_DOMAINS_FILE):
+            with open(SUCCESS_DOMAINS_FILE, 'r', encoding='utf-8') as f:
+                existing = {line.strip().lower() for line in f}
+        
+        if domain not in existing:
+            with open(SUCCESS_DOMAINS_FILE, 'a', encoding='utf-8') as f:
+                f.write(f"{domain}\n")
+    except Exception as e:
+        logging.error(f"Error saving successful domain: {e}")
+
+def get_process_state_file(username, process_id="default"):
+    return os.path.join(get_user_dir(username), f"state_{process_id}.json")
+
+def save_process_state(username, state):
+    state_file = get_process_state_file(username, state.get('id', 'default'))
+    with open(state_file, 'w', encoding='utf-8') as f:
+        json.dump(state, f, indent=2)
+
+def load_process_state(username, process_id="default"):
+    state_file = get_process_state_file(username, process_id)
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return None
+    return None
+
+def delete_process_state(username, process_id="default"):
+    state_file = get_process_state_file(username, process_id)
+    if os.path.exists(state_file):
+        try:
+            os.remove(state_file)
+        except:
+            pass
+
 fake = Faker()
 
 CONFIG = {
@@ -902,184 +949,161 @@ async def process_domain_with_retry(page, domain, email):
     
     return False
 
-async def process_single_domain(p, domain, email, username, results, current_domains):
+def is_infinity_process(username):
+    try:
+        with open('users.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                parts = line.strip().split(',')
+                if len(parts) >= 3 and parts[2].strip() == username:
+                    return 'infinity-process' in [p.strip() for p in parts[4:]]
+    except:
+        pass
+    return False
+
+def get_active_processes(username):
+    return [pid for pid, p in user_processes.items() if pid.startswith(f"{username}:") and p.get('running')]
+
+def stop_user_process(username, process_id="default"):
+    pid = f"{username}:{process_id}"
+    if pid in user_processes:
+        user_processes[pid]['running'] = False
+        user_processes[pid]['paused'] = False
+        user_processes[pid]['status'] = 'Stopped by user'
+        delete_process_state(username, process_id)
+    return True
+
+def pause_user_process(username, process_id="default"):
+    pid = f"{username}:{process_id}"
+    if pid in user_processes:
+        user_processes[pid]['paused'] = True
+        user_processes[pid]['status'] = 'Paused'
+        state = load_process_state(username, process_id)
+        if state:
+            state['paused'] = True
+            save_process_state(username, state)
+    return True
+
+def resume_user_process(username, process_id="default"):
+    pid = f"{username}:{process_id}"
+    if pid in user_processes:
+        user_processes[pid]['paused'] = False
+        user_processes[pid]['status'] = 'Resuming...'
+        state = load_process_state(username, process_id)
+        if state:
+            state['paused'] = False
+            save_process_state(username, state)
+    return True
+
+async def process_single_domain(p, domain, email, username, results, current_domains, process_id="default"):
+    pid = f"{username}:{process_id}"
     domain_display = domain[:50] + '...' if len(domain) > 50 else domain
     current_domains.add(domain_display)
     
     browser = None
     try:
+        while user_processes.get(pid, {}).get('paused'):
+            await asyncio.sleep(2)
+            if not user_processes.get(pid, {}).get('running'):
+                return
+
         browser = await p.chromium.launch(
             headless=True,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--disable-web-security',
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-software-rasterizer',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-extensions',
-                '--disable-default-apps',
-                '--disable-sync',
-                '--disable-translate',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--window-size=1920,1080',
-            ],
-            slow_mo=500
+            args=['--disable-blink-features=AutomationControlled', '--no-sandbox']
         )
-        
-        context = await browser.new_context(
-            viewport={'width': 1920, 'height': 1080},
-            user_agent=random.choice(CONFIG['user_agents']),
-            java_script_enabled=True,
-            accept_downloads=False,
-            ignore_https_errors=True,
-            bypass_csp=True,
-            extra_http_headers={
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            }
-        )
-        
+        context = await browser.new_context(user_agent=random.choice(CONFIG['user_agents']))
         page = await context.new_page()
         
-        try:
-            success = await process_domain_with_retry(page, domain, email)
-            results['completed'] += 1
-            if success:
-                results['successful'] += 1
-            else:
-                results['failed'] += 1
-        except Exception as e:
-            results['completed'] += 1
+        success = await process_domain_with_retry(page, domain, email)
+        
+        if success:
+            results['successful'] += 1
+            add_successful_domain(domain)
+        else:
             results['failed'] += 1
-        finally:
-            await page.close()
-            await context.close()
             
+        results['completed'] += 1
+        results['completed_list'].append(domain)
+        
+        # Save state
+        state = {
+            'id': process_id,
+            'email': email,
+            'domains': results['all_domains'],
+            'completed_list': results['completed_list'],
+            'successful': results['successful'],
+            'failed': results['failed'],
+            'paused': user_processes.get(pid, {}).get('paused', False),
+            'last_updated': datetime.now().isoformat()
+        }
+        save_process_state(username, state)
+        
     except Exception as e:
         results['completed'] += 1
         results['failed'] += 1
     finally:
-        if browser:
-            try:
-                await browser.close()
-            except:
-                pass
+        if browser: await browser.close()
         current_domains.discard(domain_display)
 
-async def run_subscription_process_async(username, email, domains):
-    from playwright.async_api import async_playwright
+async def run_subscription_process_async(username, email, domains, process_id="default", resume_state=None):
+    pid = f"{username}:{process_id}"
     
-    valid_domains = []
-    invalid_count = 0
-    
-    for domain in domains:
-        validated_url, error = validate_domain(domain)
-        if validated_url:
-            valid_domains.append(validated_url)
-        else:
-            invalid_count += 1
-    
-    current_domains = set()
-    results = {
-        'successful': 0,
-        'failed': invalid_count,
-        'completed': 0
-    }
-    
-    user_processes[username] = {
+    if resume_state:
+        valid_domains = [d for d in resume_state['domains'] if d not in resume_state['completed_list']]
+        results = {
+            'successful': resume_state['successful'],
+            'failed': resume_state['failed'],
+            'completed': len(resume_state['completed_list']),
+            'completed_list': resume_state['completed_list'],
+            'all_domains': resume_state['domains']
+        }
+    else:
+        valid_domains = []
+        for d in domains:
+            v, _ = validate_domain(d)
+            if v: valid_domains.append(v)
+        results = {'successful': 0, 'failed': 0, 'completed': 0, 'completed_list': [], 'all_domains': valid_domains}
+
+    user_processes[pid] = {
         'running': True,
-        'progress': 0,
-        'total': len(valid_domains),
-        'status': 'Starting...',
-        'error': None,
-        'successful': 0,
-        'failed': invalid_count,
+        'paused': resume_state.get('paused', False) if resume_state else False,
+        'progress': results['completed'],
+        'total': len(results['all_domains']),
+        'status': 'Processing...',
+        'successful': results['successful'],
+        'failed': results['failed'],
         'current_domains': [],
-        'invalid_domains': invalid_count
+        'id': process_id
     }
     
+    current_domains_set = set()
     try:
-        user_processes[username]['status'] = 'Processing domains...'
-        
+        from playwright.async_api import async_playwright
         async with async_playwright() as p:
             semaphore = asyncio.Semaphore(CONFIG['max_concurrent'])
-            
-            async def process_with_semaphore(domain):
+            async def wrap(d):
                 async with semaphore:
-                    if not user_processes.get(username, {}).get('running', False):
-                        return
-                    await process_single_domain(p, domain, email, username, results, current_domains)
-                    
-                    user_processes[username]['progress'] = results['completed']
-                    user_processes[username]['successful'] = results['successful']
-                    user_processes[username]['failed'] = results['failed']
-                    user_processes[username]['current_domains'] = list(current_domains)
-                    
-                    processed = results['completed']
-                    total = len(valid_domains)
-                    user_processes[username]['status'] = f'Processing... ({processed}/{total})'
+                    if not user_processes.get(pid, {}).get('running'): return
+                    await process_single_domain(p, d, email, username, results, current_domains_set, process_id)
+                    user_processes[pid].update({
+                        'progress': results['completed'],
+                        'successful': results['successful'],
+                        'failed': results['failed'],
+                        'current_domains': list(current_domains_set)
+                    })
+            await asyncio.gather(*[wrap(d) for d in valid_domains])
             
-            tasks = [process_with_semaphore(domain) for domain in valid_domains]
-            await asyncio.gather(*tasks)
-        
-        total_processed = results['successful'] + results['failed']
-        success_rate = (results['successful'] / total_processed * 100) if total_processed > 0 else 0
-        
-        process_data = {
-            'status': 'completed' if user_processes.get(username, {}).get('running', False) else 'stopped',
-            'created_at': datetime.now().isoformat(),
-            'successful_registrations': results['successful'],
-            'failed_registrations': results['failed'],
-            'success_rate': round(success_rate, 1),
-            'total_domains_processed': total_processed,
-            'email_used': email,
-            'invalid_domains': invalid_count
-        }
-        
-        add_process_to_history(username, process_data)
-        
-        user_processes[username]['progress'] = len(valid_domains)
-        user_processes[username]['status'] = 'Completed' if user_processes[username].get('running', False) else 'Stopped'
-        user_processes[username]['running'] = False
-        user_processes[username]['current_domains'] = []
-        
+        # Completion cleanup
+        delete_process_state(username, process_id)
+        user_processes[pid]['running'] = False
+        add_process_to_history(username, {
+            'status': 'completed', 'created_at': datetime.now().isoformat(),
+            'successful_registrations': results['successful'], 'failed_registrations': results['failed'],
+            'success_rate': round(results['successful']/(results['successful']+results['failed'])*100,1) if (results['successful']+results['failed'])>0 else 0,
+            'total_domains_processed': results['successful']+results['failed'], 'email_used': email
+        })
     except Exception as e:
-        logging.error(f"Error in subscription process for {username}: {e}")
-        user_processes[username]['error'] = str(e)
-        user_processes[username]['running'] = False
-        
-        total_processed = results.get('successful', 0) + results.get('failed', 0)
-        success_rate = (results.get('successful', 0) / total_processed * 100) if total_processed > 0 else 0
-        
-        process_data = {
-            'status': 'error',
-            'created_at': datetime.now().isoformat(),
-            'successful_registrations': results.get('successful', 0),
-            'failed_registrations': results.get('failed', 0),
-            'success_rate': round(success_rate, 1),
-            'total_domains_processed': total_processed,
-            'email_used': email,
-            'error': str(e)
-        }
-        
-        add_process_to_history(username, process_data)
+        logging.error(f"Process error: {e}")
+        user_processes[pid]['running'] = False
 
-def run_subscription_process(username, email, domains):
-    def run_async_in_thread():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(run_subscription_process_async(username, email, domains))
-        finally:
-            loop.close()
-    
-    thread = threading.Thread(target=run_async_in_thread, daemon=True)
-    thread.start()
+def run_subscription_process(username, email, domains, process_id="default", resume_state=None):
+    threading.Thread(target=lambda: asyncio.run(run_subscription_process_async(username, email, domains, process_id, resume_state)), daemon=True).start()
