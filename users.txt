@@ -1,8 +1,8 @@
 # Format: entity,Name,username,password[,permissions]
 # Permissions can be: ok, allow_add_gmail_of_news (or both separated by comma)
 TSS2,Abdelali Akrrou,abdelali,TrIaOIaaq2EcLi3LLSgcdWz3,ok,Extract_emails,Domain_checker,blacklist_lookup,download_extension
-TSSW,Redouan El Arras,redouan,red123*00,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions,quality_helper
-TSSW,Youssef Ouiguemane,y.ouiguemane,y.ouiguemane2234,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions,quality_helper
+TSSW,Redouan El Arras,redouan,red123*00,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions,quality_helper,news_sign_subsctiption
+TSSW,Youssef Ouiguemane,y.ouiguemane,y.ouiguemane2234,find_news,Extract_emails,Domain_checker,allow_add_gmail_of_news,tssw_report,gmass,blacklist_lookup,download_extension,add_extensions,quality_helper,news_sign_subsctiption
 TSS2,M. Edraoui,M.Edraoui,vYfeg2C5SXo8lbmQ8eai4t1,gmass
 TSS2,HAMZA BOUDFA,H.BOUDFA,5C56giIhxd3L3pKkzPB5QTW,gmass
 TSS2,Ikram Ait Hadi,I.Ait_Hadi,Q13T2v52HGNdVoJe7hs59pQ,gmass
