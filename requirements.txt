@@ -226,3 +226,16 @@ gunicorn
 psycopg2-binary
 requests
 faker
+email_validator
+flask
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
+beautifulsoup4
+email-validator
+flask
+flask-login
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
+requests
