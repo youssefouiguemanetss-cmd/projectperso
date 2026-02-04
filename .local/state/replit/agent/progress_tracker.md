@@ -192,4 +192,6 @@
 [x] 141. News Subscription: Added pause/resume functionality with JSON persistence
 [x] 142. News Subscription: Supported multiple concurrent processes for users with "infinity-process" permission
 [x] 143. News Subscription: Implemented global logging of successful domains to all_successfully_domain.txt
-[x] 144. News Subscription: Redesigned dashboard UI to support managing multiple independent processes
+[x] 145. Extract Emails: Optimized IMAP connection with 30s timeout to prevent freezes
+[x] 146. Extract Emails: Implemented connection health check and auto-reconnect logic during batch processing
+[x] 147. Extract Emails: Added micro-delays (0.01s) during email processing to reduce CPU contention under heavy load

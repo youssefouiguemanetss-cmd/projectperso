@@ -169,7 +169,8 @@ def connect_to_gmail(email_addr, password):
         return None
         
     try:
-        mail = imaplib.IMAP4_SSL('imap.gmail.com', 993)
+        # Optimization: Add timeout to prevent freezing on slow/blocked connections
+        mail = imaplib.IMAP4_SSL('imap.gmail.com', 993, timeout=30)
         mail.login(email_addr, password)
         logging.info(f"Successfully connected to Gmail account: {email_addr}")
         return mail
@@ -251,6 +252,16 @@ def extract_and_analyze_emails(email_address, app_password, email_limit='all', f
                 total_emails = len(uid_list)
                 
                 for batch_start in range(0, total_emails, batch_size):
+                    # Check if the connection is still alive before each batch
+                    try:
+                        mail.noop()
+                    except:
+                        logging.error("IMAP connection lost during extraction, attempting to reconnect...")
+                        mail = connect_to_gmail(email_address, app_password)
+                        if not mail:
+                            break
+                        mail.select(folder, readonly=True)
+
                     batch_end = min(batch_start + batch_size, total_emails)
                     batch_uids = uid_list[batch_start:batch_end]
                     
@@ -306,6 +317,10 @@ def extract_and_analyze_emails(email_address, app_password, email_limit='all', f
                                 dkim_status = extract_dkim_status(email_message)
                                 dmarc_status = extract_dmarc_status(email_message)
                                 
+                                # Optimization: Small sleep to prevent CPU spiking during heavy concurrent usage
+                                # and allow other threads to process
+                                time.sleep(0.01)
+
                                 # Determine email type and category
                                 email_type = 'Spam' if folder == '[Gmail]/Spam' else 'Inbox'
                                 # Keep UID as bytes to match category_cache keys
