@@ -319,7 +319,7 @@ def extract_and_analyze_emails(email_address, app_password, email_limit='all', f
                                 
                                 # Optimization: Small sleep to prevent CPU spiking during heavy concurrent usage
                                 # and allow other threads to process
-                                time.sleep(0.01)
+                                time.sleep(0.02)
 
                                 # Determine email type and category
                                 email_type = 'Spam' if folder == '[Gmail]/Spam' else 'Inbox'

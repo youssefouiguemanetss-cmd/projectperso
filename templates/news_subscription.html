@@ -176,6 +176,11 @@
                 const response = await fetch('/api/news-subscription/status');
                 const data = await response.json();
                 
+                if (response.status === 403) {
+                    console.error('Permission denied to news subscription status');
+                    return;
+                }
+                
                 if (data.error) return;
                 
                 const container = document.getElementById('processes-container');

@@ -1006,9 +1006,14 @@ async def process_single_domain(p, domain, email, username, results, current_dom
             if not user_processes.get(pid, {}).get('running'):
                 return
 
+        # Adaptive delay based on active processes to prevent CPU contention
+        active_count = len([p for p in user_processes.values() if p.get('running')])
+        if active_count > 5:
+            await asyncio.sleep(0.5)
+
         browser = await p.chromium.launch(
             headless=True,
-            args=['--disable-blink-features=AutomationControlled', '--no-sandbox']
+            args=['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
         )
         context = await browser.new_context(user_agent=random.choice(CONFIG['user_agents']))
         page = await context.new_page()
