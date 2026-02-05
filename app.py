@@ -3308,12 +3308,25 @@ def news_subscription_resume():
     resume_user_process(current_user.username, data.get('process_id', 'default'))
     return jsonify({'success': True})
 
+@app.route('/api/news-subscription/history')
+@login_required
+def news_subscription_history():
+    if not current_user.has_news_subscription_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    from news_subscription import get_user_process_history
+    username = current_user.username
+    history = get_user_process_history(username)
+    return jsonify({'history': history})
+
 @app.route('/api/news-subscription/stop', methods=['POST'])
 @login_required
 def news_subscription_stop():
     from news_subscription import stop_user_process
     data = request.get_json()
-    stop_user_process(current_user.username, data.get('process_id', 'default'))
+    username = current_user.username
+    process_id = data.get('process_id', 'default')
+    stop_user_process(username, process_id)
     return jsonify({'success': True})
 
 @app.route('/api/news-subscription/delete', methods=['POST'])
