@@ -13,6 +13,33 @@ import dns.resolver
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response, stream_with_context
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+
+# Custom logger to include username in werkzeug logs
+class UserLogFilter(logging.Filter):
+    def filter(self, record):
+        try:
+            from flask import has_request_context, request
+            if has_request_context():
+                user = "anonymous"
+                if current_user and current_user.is_authenticated:
+                    user = current_user.username
+                record.user = user
+            else:
+                record.user = "system"
+        except:
+            record.user = "unknown"
+        return True
+
+# Update werkzeug logging format
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.addFilter(UserLogFilter())
+for handler in werkzeug_logger.handlers:
+    handler.setFormatter(logging.Formatter('%(remote_addr)s - [%(user)s] - [%(asctime)s] "%(message)s" %(status)s %(size)s'))
+
+# If no handlers exist yet (common in some environments), we'll set a custom format for the root logger too
+logging.getLogger().addFilter(UserLogFilter())
+for handler in logging.getLogger().handlers:
+    handler.setFormatter(logging.Formatter('ERROR:root:[%(user)s] %(message)s'))
 from connection_manager import gmail_manager
 
 
@@ -158,7 +185,7 @@ def authenticate_user(username, password):
     return None
 
 def connect_to_gmail(email_addr, password):
-    """Connect to Gmail using IMAP with enhanced error handling and validation"""
+    """Connect to Gmail using IMAP with enhanced error handling, validation and retries"""
     if not email_addr or not password:
         logging.error("Email address and password are required")
         return None
@@ -168,18 +195,31 @@ def connect_to_gmail(email_addr, password):
         logging.error(f"Invalid email address format: {email_addr}")
         return None
         
-    try:
-        # Optimization: Add timeout to prevent freezing on slow/blocked connections
-        mail = imaplib.IMAP4_SSL('imap.gmail.com', 993, timeout=30)
-        mail.login(email_addr, password)
-        logging.info(f"Successfully connected to Gmail account: {email_addr}")
-        return mail
-    except imaplib.IMAP4.error as e:
-        logging.error(f"IMAP authentication failed for {email_addr}: {e}")
-        return None
-    except Exception as e:
-        logging.error(f"Unexpected error connecting to Gmail {email_addr}: {e}")
-        return None
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            # Increased timeout for SSL handshake and connection
+            # IMAP4_SSL timeout applies to the initial connection and handshake
+            mail = imaplib.IMAP4_SSL('imap.gmail.com', 993, timeout=60)
+            mail.login(email_addr, password)
+            logging.info(f"Successfully connected to Gmail account: {email_addr}")
+            return mail
+        except (imaplib.IMAP4.error, ConnectionError, TimeoutError, Exception) as e:
+            error_msg = str(e)
+            logging.error(f"Connection attempt {attempt + 1} failed for {email_addr}: {error_msg}")
+            
+            if "handshake operation timed out" in error_msg.lower() or "timeout" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    logging.info(f"Retrying connection to {email_addr} in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    continue
+            
+            if isinstance(e, imaplib.IMAP4.error):
+                logging.error(f"IMAP authentication failed for {email_addr}: {e}")
+            return None
+    return None
 
 def decode_mime_words(s):
     """Decode MIME encoded words"""
