@@ -14,19 +14,23 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response, stream_with_context
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET")
-
 # Custom logger to include username in werkzeug logs
 class UserLogFilter(logging.Filter):
     def filter(self, record):
         try:
             from flask import has_request_context
+            # Ensure remote_addr is always present to prevent KeyError in some environments
+            if not hasattr(record, 'remote_addr'):
+                record.remote_addr = '127.0.0.1'
+                
             if has_request_context():
                 from flask_login import current_user
                 user = "anonymous"
-                if current_user and current_user.is_authenticated:
-                    user = current_user.username
+                try:
+                    if current_user and current_user.is_authenticated:
+                        user = current_user.username
+                except:
+                    pass
                 record.user = user
             else:
                 record.user = "system"
@@ -34,13 +38,18 @@ class UserLogFilter(logging.Filter):
             record.user = "unknown"
         return True
 
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET")
+
 # Update werkzeug logging format
-# We do this late to ensure werkzeug is initialized
 @app.before_request
 def setup_logging():
     if not hasattr(app, '_logging_setup_done'):
-        log_format = '%(remote_addr)s - [%(user)s] - [%(asctime)s] "%(message)s" %(status)s %(size)s'
+        # Using a safer format that doesn't rely on remote_addr or specific attributes
+        # We include [user] which we populate in the Filter
+        log_format = '[%(user)s] %(message)s'
         werkzeug_logger = logging.getLogger('werkzeug')
+        
         # Remove existing handlers to avoid duplicates
         for handler in werkzeug_logger.handlers[:]:
             werkzeug_logger.removeHandler(handler)
@@ -49,7 +58,6 @@ def setup_logging():
         handler.addFilter(UserLogFilter())
         handler.setFormatter(logging.Formatter(log_format))
         werkzeug_logger.addHandler(handler)
-        # Prevent propagation to avoid double logging
         werkzeug_logger.propagate = False
         app._logging_setup_done = True
 from connection_manager import gmail_manager
