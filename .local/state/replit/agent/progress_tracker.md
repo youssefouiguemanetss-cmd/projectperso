@@ -194,4 +194,6 @@
 [x] 143. News Subscription: Implemented global logging of successful domains to all_successfully_domain.txt
 [x] 145. Extract Emails: Optimized IMAP connection with 30s timeout to prevent freezes
 [x] 146. Extract Emails: Implemented connection health check and auto-reconnect logic during batch processing
-[x] 147. Extract Emails: Added micro-delays (0.01s) during email processing to reduce CPU contention under heavy load
+[x] 148. Extract Emails: Added 3x retry logic for SSL handshake timeouts with increased 60s timeout
+[x] 149. Logging: Enhanced Flask logs to include [username] for all requests using a custom logging filter
+[x] 150. News Subscription: Fixed "Stop" button by adding explicit cleanup and delayed memory removal for better status feedback

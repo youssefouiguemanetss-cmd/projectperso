@@ -969,6 +969,16 @@ def stop_user_process(username, process_id="default"):
         user_processes[pid]['running'] = False
         user_processes[pid]['paused'] = False
         user_processes[pid]['status'] = 'Stopped by user'
+        # Explicitly remove from memory if it's in a state that can be cleaned up
+        # but keep the object for a moment so the status check can see 'Stopped'
+        def delayed_cleanup():
+            import time
+            time.sleep(5)
+            if pid in user_processes and not user_processes[pid]['running']:
+                del user_processes[pid]
+        
+        import threading
+        threading.Thread(target=delayed_cleanup, daemon=True).start()
         delete_process_state(username, process_id)
     return True
 

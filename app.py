@@ -14,12 +14,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, flash, jsonify, redirect, url_for, session, Response, stream_with_context
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET")
+
 # Custom logger to include username in werkzeug logs
 class UserLogFilter(logging.Filter):
     def filter(self, record):
         try:
-            from flask import has_request_context, request
+            from flask import has_request_context
             if has_request_context():
+                from flask_login import current_user
                 user = "anonymous"
                 if current_user and current_user.is_authenticated:
                     user = current_user.username
@@ -31,22 +35,26 @@ class UserLogFilter(logging.Filter):
         return True
 
 # Update werkzeug logging format
-werkzeug_logger = logging.getLogger('werkzeug')
-werkzeug_logger.addFilter(UserLogFilter())
-for handler in werkzeug_logger.handlers:
-    handler.setFormatter(logging.Formatter('%(remote_addr)s - [%(user)s] - [%(asctime)s] "%(message)s" %(status)s %(size)s'))
-
-# If no handlers exist yet (common in some environments), we'll set a custom format for the root logger too
-logging.getLogger().addFilter(UserLogFilter())
-for handler in logging.getLogger().handlers:
-    handler.setFormatter(logging.Formatter('ERROR:root:[%(user)s] %(message)s'))
+# We do this late to ensure werkzeug is initialized
+@app.before_request
+def setup_logging():
+    if not hasattr(app, '_logging_setup_done'):
+        log_format = '%(remote_addr)s - [%(user)s] - [%(asctime)s] "%(message)s" %(status)s %(size)s'
+        werkzeug_logger = logging.getLogger('werkzeug')
+        # Remove existing handlers to avoid duplicates
+        for handler in werkzeug_logger.handlers[:]:
+            werkzeug_logger.removeHandler(handler)
+        
+        handler = logging.StreamHandler()
+        handler.addFilter(UserLogFilter())
+        handler.setFormatter(logging.Formatter(log_format))
+        werkzeug_logger.addHandler(handler)
+        # Prevent propagation to avoid double logging
+        werkzeug_logger.propagate = False
+        app._logging_setup_done = True
 from connection_manager import gmail_manager
 
-
 logging.basicConfig(level=logging.DEBUG)
-
-app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET")
 
 
 if not app.secret_key:
@@ -209,6 +217,9 @@ def connect_to_gmail(email_addr, password):
         except (imaplib.IMAP4.error, ConnectionError, TimeoutError, Exception) as e:
             error_msg = str(e)
             logging.error(f"Connection attempt {attempt + 1} failed for {email_addr}: {error_msg}")
+            
+            # Additional diagnostic logging for extraction issues
+            logging.debug(f"IMAP connection failed during extraction for {email_addr}. Attempt: {attempt+1}/{max_retries}")
             
             if "handshake operation timed out" in error_msg.lower() or "timeout" in error_msg.lower():
                 if attempt < max_retries - 1:
