@@ -126,11 +126,32 @@ def delete_process_from_history(username, process_id):
 def is_process_running(username):
     return username in user_processes and user_processes[username].get('running', False)
 
-def stop_user_process(username):
-    if username in user_processes:
-        user_processes[username]['running'] = False
-        user_processes[username]['status'] = 'Stopped by user'
-    return True
+def stop_user_process(username, process_id='default'):
+    """Stop a specific process and ensure it is saved to history."""
+    with get_user_lock(username):
+        if username in user_processes:
+            process = user_processes[username]
+            if process.get('id') == process_id or process_id == 'default':
+                process['running'] = False
+                process['status'] = 'Stopped by user'
+                
+                # Save to history immediately when stopped
+                history_data = {
+                    'id': process.get('id'),
+                    'email_used': process.get('email'),
+                    'total_domains_processed': process.get('progress', 0),
+                    'successful_registrations': process.get('successful', 0),
+                    'failed_registrations': process.get('failed', 0),
+                    'success_rate': round((process.get('successful', 0) / process.get('progress', 1)) * 100) if process.get('progress', 0) > 0 else 0,
+                    'created_at': datetime.now().isoformat(),
+                    'status': 'stopped'
+                }
+                add_process_to_history(username, history_data)
+                
+                # Clean up the running process
+                del user_processes[username]
+                return True
+    return False
 
 def validate_domain(domain):
     domain = domain.strip()
