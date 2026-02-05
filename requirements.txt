@@ -239,3 +239,11 @@ flask-sqlalchemy
 gunicorn
 psycopg2-binary
 requests
+beautifulsoup4
+email-validator
+flask
+flask-login
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
+requests
