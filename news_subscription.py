@@ -154,7 +154,8 @@ def stop_user_process(username, process_id='default'):
             save_process_state(username, process)
             
             # Clean up the running process
-            del user_processes[internal_pid]
+            if internal_pid in user_processes:
+                del user_processes[internal_pid]
             
             # Also clean up the state file if it exists
             delete_process_state(username, process_id)
