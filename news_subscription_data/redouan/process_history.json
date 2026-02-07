@@ -1,0 +1,62 @@
+[
+  {
+    "status": "completed",
+    "created_at": "2026-02-05T15:50:17.123886",
+    "successful_registrations": 649,
+    "failed_registrations": 2178,
+    "success_rate": 23.0,
+    "total_domains_processed": 2827,
+    "email_used": "tsswbackup@gmail.com",
+    "id": "f5941549-97b7-41ef-b7d7-a042b6734a24"
+  },
+  {
+    "status": "completed",
+    "created_at": "2026-02-05T15:50:13.329139",
+    "successful_registrations": 636,
+    "failed_registrations": 2201,
+    "success_rate": 22.4,
+    "total_domains_processed": 2837,
+    "email_used": "tsswbackup@gmail.com",
+    "id": "917c2ec1-c5fa-4bc8-b5d4-24912ee0dc61"
+  },
+  {
+    "status": "completed",
+    "created_at": "2026-02-05T15:50:11.320604",
+    "successful_registrations": 609,
+    "failed_registrations": 2209,
+    "success_rate": 21.6,
+    "total_domains_processed": 2818,
+    "email_used": "tsswbackup@gmail.com",
+    "id": "e9d0ffaf-c5fe-47db-b368-babda84b01e8"
+  },
+  {
+    "status": "completed",
+    "created_at": "2026-02-05T15:50:07.081907",
+    "successful_registrations": 591,
+    "failed_registrations": 2214,
+    "success_rate": 21.1,
+    "total_domains_processed": 2805,
+    "email_used": "tsswbackup@gmail.com",
+    "id": "65a5b4be-558c-4bab-ae85-35ca1b70b6e4"
+  },
+  {
+    "status": "completed",
+    "created_at": "2026-02-05T15:49:53.174069",
+    "successful_registrations": 627,
+    "failed_registrations": 2167,
+    "success_rate": 22.4,
+    "total_domains_processed": 2794,
+    "email_used": "tsswbackup@gmail.com",
+    "id": "03381186-546e-4279-8f75-e91c2fb3a84b"
+  },
+  {
+    "status": "completed",
+    "created_at": "2026-02-03T16:36:34.363988",
+    "successful_registrations": 118,
+    "failed_registrations": 410,
+    "success_rate": 22.3,
+    "total_domains_processed": 528,
+    "email_used": "tss4productionsecrets@gmail.com",
+    "id": "965a3c2d-3231-486a-ada8-d97f17afc0b4"
+  }
+]
