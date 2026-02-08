@@ -110,38 +110,48 @@ class User(UserMixin):
         self.has_add_extensions_permission = False
         self.has_quality_helper_permission = False
         self.has_news_subscription_permission = False
+        self.has_user_management_permission = False
+        self.max_processes = 1  # Default limit
+        self.domain_quota = 0   # Default quota (0 means unlimited or not set)
+        self.domains_processed_this_month = 0
 
 @login_manager.user_loader
 def load_user(user_id):
     """Load user from session"""
     users = load_users_from_file()
     for user_data in users:
-        entity = user_data['entity']
-        name = user_data['name']
-        username = user_data['username']
-        has_toggle = user_data['has_toggle_permission']
-        has_news = user_data['has_news_permission']
-        has_domain_checker = user_data['has_domain_checker_permission']
-        has_find_news = user_data['has_find_news_permission']
-        has_extract_emails = user_data['has_extract_emails_permission']
-        has_tssw_report = user_data['has_tssw_report_permission']
-        has_gmass = user_data['has_gmass_permission']
-        has_blacklist_lookup = user_data['has_blacklist_lookup_permission']
-        if username == user_id:
-            user = User(username, entity, name, has_toggle, has_news, has_domain_checker, has_find_news, has_extract_emails, has_tssw_report, has_gmass, has_blacklist_lookup)
-            # Add new extension permissions
+        if user_data['username'] == user_id:
+            user = User(
+                user_data['username'], 
+                user_data['entity'], 
+                user_data['name'], 
+                user_data['has_toggle_permission'], 
+                user_data['has_news_permission'], 
+                user_data['has_domain_checker_permission'], 
+                user_data['has_find_news_permission'], 
+                user_data['has_extract_emails_permission'], 
+                user_data['has_tssw_report_permission'], 
+                user_data['has_gmass_permission'], 
+                user_data['has_blacklist_lookup_permission']
+            )
             permissions = user_data.get('permissions', [])
             user.has_download_extension_permission = 'download_extension' in permissions
             user.has_add_extensions_permission = 'add_extensions' in permissions
             user.has_quality_helper_permission = 'quality_helper' in permissions
             user.has_news_subscription_permission = 'news_sign_subsctiption' in permissions
+            user.has_user_management_permission = 'user_management' in permissions
+            user.max_processes = user_data.get('max_processes', 1)
+            user.domain_quota = user_data.get('domain_quota', 0)
+            user.domains_processed_this_month = user_data.get('domains_processed_this_month', 0)
             return user
     return None
 
 def load_users_from_file():
-    """Load users from users.txt file with new format: entity,Name,username,password[,permissions]"""
+    """Load users from users.txt file with format: entity,Name,username,password,permissions,max_processes,domain_quota,domains_processed_this_month"""
     users = []
     try:
+        if not os.path.exists('users.txt'):
+            return users
         with open('users.txt', 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
@@ -153,39 +163,46 @@ def load_users_from_file():
                             name = parts[1].strip()
                             username = parts[2].strip()
                             password = parts[3].strip()
-                            permissions = [p.strip() for p in parts[4:]] if len(parts) > 4 else []
-                            has_toggle = 'ok' in permissions
-                            has_news = 'allow_add_gmail_of_news' in permissions
-                            has_domain_checker = 'Domain_checker' in permissions
-                            has_find_news = 'find_news' in permissions
-                            has_extract_emails = 'Extract_emails' in permissions
-                            has_tssw_report = 'tssw_report' in permissions
-                            has_gmass = 'gmass' in permissions
-                            has_blacklist_lookup = 'blacklist_lookup' in permissions
+                            permissions = []
+                            if len(parts) > 4 and parts[4].strip():
+                                permissions = [p.strip() for p in parts[4].split(';') if p.strip()] if ';' in parts[4] else [p.strip() for p in parts[4].split(' ') if p.strip()]
+                                if not permissions and parts[4].strip(): # Fallback for old comma format or single permission
+                                     permissions = [p.strip() for p in parts[4:] if not p.strip().isdigit()]
+                            
+                            # Quota and process fields
+                            max_processes = 1
+                            domain_quota = 0
+                            domains_processed = 0
+                            
+                            # Try to find numeric values at the end of the line
+                            numeric_parts = [p.strip() for p in parts if p.strip().isdigit()]
+                            if len(numeric_parts) >= 3:
+                                max_processes = int(numeric_parts[-3])
+                                domain_quota = int(numeric_parts[-2])
+                                domains_processed = int(numeric_parts[-1])
+                            elif len(numeric_parts) == 2:
+                                max_processes = int(numeric_parts[-2])
+                                domain_quota = int(numeric_parts[-1])
+                            elif len(numeric_parts) == 1:
+                                max_processes = int(numeric_parts[-1])
+
                             users.append({
-                                'entity': entity,
-                                'name': name,
-                                'username': username,
-                                'password': password,
-                                'permissions': permissions,
-                                'has_toggle_permission': has_toggle,
-                                'has_news_permission': has_news,
-                                'has_domain_checker_permission': has_domain_checker,
-                                'has_find_news_permission': has_find_news,
-                                'has_extract_emails_permission': has_extract_emails,
-                                'has_tssw_report_permission': has_tssw_report,
-                                'has_gmass_permission': has_gmass,
-                                'has_blacklist_lookup_permission': has_blacklist_lookup
+                                'entity': entity, 'name': name, 'username': username, 'password': password,
+                                'permissions': permissions, 'max_processes': max_processes,
+                                'domain_quota': domain_quota, 'domains_processed_this_month': domains_processed,
+                                'has_toggle_permission': 'ok' in permissions,
+                                'has_news_permission': 'allow_add_gmail_of_news' in permissions,
+                                'has_domain_checker_permission': 'Domain_checker' in permissions,
+                                'has_find_news_permission': 'find_news' in permissions,
+                                'has_extract_emails_permission': 'Extract_emails' in permissions,
+                                'has_tssw_report_permission': 'tssw_report' in permissions,
+                                'has_gmass_permission': 'gmass' in permissions,
+                                'has_blacklist_lookup_permission': 'blacklist_lookup' in permissions
                             })
-                        else:
-                            logging.warning(f"Invalid format in users.txt line {line_num}: {line}")
                     except Exception as e:
                         logging.error(f"Error parsing users.txt line {line_num}: {e}")
-    except FileNotFoundError:
-        logging.error("users.txt file not found")
     except Exception as e:
         logging.error(f"Error reading users.txt: {e}")
-    
     return users
 
 def get_user_accounts(user_entity):
