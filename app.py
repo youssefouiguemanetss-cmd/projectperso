@@ -3298,7 +3298,7 @@ def news_subscription():
     if not current_user.has_news_subscription_permission:
         flash('You do not have permission to access News Subscription.', 'error')
         return redirect(url_for('services'))
-    is_admin = has_user_management_permission(current_user.username)
+    is_admin = current_user.has_user_management_permission
     return render_template('news_subscription.html', is_admin=is_admin)
 
 @app.route('/api/news-subscription/status')
@@ -3461,7 +3461,7 @@ def news_subscription_delete():
 @app.route('/api/news-subscription/successful-domains')
 @login_required
 def news_subscription_successful_domains():
-    if not has_user_management_permission(current_user.username):
+    if not current_user.has_user_management_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     
     domains = []
