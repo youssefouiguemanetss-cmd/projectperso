@@ -16,6 +16,14 @@ os.makedirs(USER_DATA_DIR, exist_ok=True)
 
 SUCCESS_DOMAINS_FILE = "all_successfully_domain.txt"
 
+GLOBAL_BROWSER_SEMAPHORE = threading.Semaphore(3)
+
+def _lower_thread_priority():
+    try:
+        os.nice(10)
+    except (OSError, AttributeError):
+        pass
+
 def add_successful_domain(domain):
     """Add a domain to the global successful domains list."""
     try:
@@ -72,7 +80,7 @@ CONFIG = {
     'navigation_timeout': 30000,
     'form_fill_delay': 800,
     'captcha_wait': 20000,
-    'max_concurrent': 4,
+    'max_concurrent': 2,
     'user_agents': [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -1010,25 +1018,6 @@ def is_infinity_process(username):
 def get_active_processes(username):
     return [pid for pid, p in user_processes.items() if pid.startswith(f"{username}:") and p.get('running')]
 
-def stop_user_process(username, process_id="default"):
-    pid = f"{username}:{process_id}"
-    if pid in user_processes:
-        user_processes[pid]['running'] = False
-        user_processes[pid]['paused'] = False
-        user_processes[pid]['status'] = 'Stopped by user'
-        # Explicitly remove from memory if it's in a state that can be cleaned up
-        # but keep the object for a moment so the status check can see 'Stopped'
-        def delayed_cleanup():
-            import time
-            time.sleep(5)
-            if pid in user_processes and not user_processes[pid]['running']:
-                del user_processes[pid]
-        
-        import threading
-        threading.Thread(target=delayed_cleanup, daemon=True).start()
-        delete_process_state(username, process_id)
-    return True
-
 def pause_user_process(username, process_id="default"):
     pid = f"{username}:{process_id}"
     if pid in user_processes:
@@ -1055,38 +1044,72 @@ async def process_single_domain(p, domain, email, username, results, current_dom
     pid = f"{username}:{process_id}"
     domain_display = domain[:50] + '...' if len(domain) > 50 else domain
     
-    # Check if process still exists before starting
     if pid not in user_processes:
         return
         
     current_domains.add(domain_display)
     
     browser = None
+    acquired_global = False
     try:
         while user_processes.get(pid, {}).get('paused'):
             await asyncio.sleep(2)
             if pid not in user_processes or not user_processes[pid].get('running'):
                 return
 
-        # Double check if process was stopped while waiting for pause
         if pid not in user_processes or not user_processes[pid].get('running'):
             return
 
-        # Adaptive delay based on active processes to prevent CPU contention
-        active_count = len([p for p in user_processes.values() if p.get('running')])
-        if active_count > 5:
-            await asyncio.sleep(0.5)
+        active_count = len([proc for proc in user_processes.values() if proc.get('running')])
+        delay = random.uniform(1.0, 3.0) + (0.5 * max(0, active_count - 1))
+        await asyncio.sleep(delay)
+
+        for _ in range(60):
+            got = GLOBAL_BROWSER_SEMAPHORE.acquire(blocking=False)
+            if got:
+                acquired_global = True
+                break
+            if pid not in user_processes or not user_processes[pid].get('running'):
+                return
+            await asyncio.sleep(1)
+        
+        if not acquired_global:
+            results['completed'] += 1
+            results['failed'] += 1
+            return
+
+        if pid not in user_processes or not user_processes[pid].get('running'):
+            return
 
         browser = await p.chromium.launch(
             headless=True,
-            args=['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--single-process',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--disable-translate',
+                '--no-first-run',
+                '--disable-default-apps',
+                '--disable-hang-monitor',
+                '--disable-prompt-on-repost',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-update',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-ipc-flooding-protection',
+                '--js-flags=--max-old-space-size=128',
+            ]
         )
         context = await browser.new_context(user_agent=random.choice(CONFIG['user_agents']))
         page = await context.new_page()
         
         success = await process_domain_with_retry(page, domain, email)
         
-        # Check if process was stopped during processing
         if pid not in user_processes or not user_processes[pid].get('running'):
             if browser: await browser.close()
             return
@@ -1100,7 +1123,6 @@ async def process_single_domain(p, domain, email, username, results, current_dom
         results['completed'] += 1
         results['completed_list'].append(domain)
         
-        # Save state
         state = {
             'id': process_id,
             'email': email,
@@ -1115,12 +1137,20 @@ async def process_single_domain(p, domain, email, username, results, current_dom
         }
         save_process_state(username, state)
         
+        await asyncio.sleep(random.uniform(0.5, 1.5))
+        
     except Exception as e:
         if pid in user_processes:
             results['completed'] += 1
             results['failed'] += 1
     finally:
-        if browser: await browser.close()
+        if browser:
+            try:
+                await browser.close()
+            except Exception:
+                pass
+        if acquired_global:
+            GLOBAL_BROWSER_SEMAPHORE.release()
         current_domains.discard(domain_display)
 
 async def run_subscription_process_async(username, email, domains, process_id="default", resume_state=None):
@@ -1160,17 +1190,24 @@ async def run_subscription_process_async(username, email, domains, process_id="d
         from playwright.async_api import async_playwright
         async with async_playwright() as p:
             semaphore = asyncio.Semaphore(CONFIG['max_concurrent'])
-            async def wrap(d):
-                async with semaphore:
-                    if not user_processes.get(pid, {}).get('running'): return
-                    await process_single_domain(p, d, email, username, results, current_domains_set, process_id)
-                    user_processes[pid].update({
-                        'progress': results['completed'],
-                        'successful': results['successful'],
-                        'failed': results['failed'],
-                        'current_domains': list(current_domains_set)
-                    })
-            await asyncio.gather(*[wrap(d) for d in valid_domains])
+            batch_size = CONFIG['max_concurrent']
+            for i in range(0, len(valid_domains), batch_size):
+                if not user_processes.get(pid, {}).get('running'):
+                    break
+                batch = valid_domains[i:i + batch_size]
+                async def wrap(d):
+                    async with semaphore:
+                        if not user_processes.get(pid, {}).get('running'): return
+                        await process_single_domain(p, d, email, username, results, current_domains_set, process_id)
+                        if pid in user_processes:
+                            user_processes[pid].update({
+                                'progress': results['completed'],
+                                'successful': results['successful'],
+                                'failed': results['failed'],
+                                'current_domains': list(current_domains_set)
+                            })
+                await asyncio.gather(*[wrap(d) for d in batch])
+                await asyncio.sleep(random.uniform(1.0, 2.0))
             
             # Check if process still exists before final completion
             if pid not in user_processes:
@@ -1218,4 +1255,7 @@ async def run_subscription_process_async(username, email, domains, process_id="d
             user_processes[pid]['status'] = f"Error: {str(e)}"
 
 def run_subscription_process(username, email, domains, process_id="default", resume_state=None):
-    threading.Thread(target=lambda: asyncio.run(run_subscription_process_async(username, email, domains, process_id, resume_state)), daemon=True).start()
+    def _run_with_low_priority():
+        _lower_thread_priority()
+        asyncio.run(run_subscription_process_async(username, email, domains, process_id, resume_state))
+    threading.Thread(target=_run_with_low_priority, daemon=True).start()

@@ -224,3 +224,12 @@
     - Comma validation: Prevents commas in user fields to protect CSV format
     - Monthly quota persistence: Reset persisted to disk on load
     - Added user_management permission to redouan and y.ouiguemane users
+[x] 166. News Subscription Performance Optimization - Feb 08, 2026:
+    - Global browser semaphore: max 3 simultaneous Chromium browsers across all users/processes
+    - Reduced per-process concurrent browsers from 4 to 2
+    - Resource-friendly Chromium flags (--single-process, --max-old-space-size=128, etc.)
+    - Thread priority lowering via os.nice(10) so Flask stays responsive
+    - Batch processing with delays between batches instead of all-at-once asyncio.gather
+    - Adaptive delays between domains based on active process count
+    - Non-blocking semaphore acquisition with 60s timeout (cancellable on stop)
+    - Removed duplicate stop_user_process function (kept version with history saving)
