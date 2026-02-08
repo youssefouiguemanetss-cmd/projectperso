@@ -1054,14 +1054,23 @@ def resume_user_process(username, process_id="default"):
 async def process_single_domain(p, domain, email, username, results, current_domains, process_id="default"):
     pid = f"{username}:{process_id}"
     domain_display = domain[:50] + '...' if len(domain) > 50 else domain
+    
+    # Check if process still exists before starting
+    if pid not in user_processes:
+        return
+        
     current_domains.add(domain_display)
     
     browser = None
     try:
         while user_processes.get(pid, {}).get('paused'):
             await asyncio.sleep(2)
-            if not user_processes.get(pid, {}).get('running'):
+            if pid not in user_processes or not user_processes[pid].get('running'):
                 return
+
+        # Double check if process was stopped while waiting for pause
+        if pid not in user_processes or not user_processes[pid].get('running'):
+            return
 
         # Adaptive delay based on active processes to prevent CPU contention
         active_count = len([p for p in user_processes.values() if p.get('running')])
@@ -1077,6 +1086,11 @@ async def process_single_domain(p, domain, email, username, results, current_dom
         
         success = await process_domain_with_retry(page, domain, email)
         
+        # Check if process was stopped during processing
+        if pid not in user_processes or not user_processes[pid].get('running'):
+            if browser: await browser.close()
+            return
+
         if success:
             results['successful'] += 1
             add_successful_domain(domain)
@@ -1095,14 +1109,16 @@ async def process_single_domain(p, domain, email, username, results, current_dom
             'successful': results['successful'],
             'failed': results['failed'],
             'paused': user_processes.get(pid, {}).get('paused', False),
+            'running': user_processes.get(pid, {}).get('running', True),
             'last_updated': datetime.now().isoformat(),
             'start_time': user_processes.get(pid, {}).get('start_time')
         }
         save_process_state(username, state)
         
     except Exception as e:
-        results['completed'] += 1
-        results['failed'] += 1
+        if pid in user_processes:
+            results['completed'] += 1
+            results['failed'] += 1
     finally:
         if browser: await browser.close()
         current_domains.discard(domain_display)
@@ -1156,7 +1172,14 @@ async def run_subscription_process_async(username, email, domains, process_id="d
                     })
             await asyncio.gather(*[wrap(d) for d in valid_domains])
             
-        # Completion cleanup
+            # Check if process still exists before final completion
+            if pid not in user_processes:
+                return
+
+        if pid not in user_processes:
+            logging.error(f"PID {pid} not found in user_processes during completion cleanup")
+            return
+
         end_time = datetime.now()
         start_time_str = user_processes[pid].get('start_time')
         duration_str = "N/A"
@@ -1184,9 +1207,15 @@ async def run_subscription_process_async(username, email, domains, process_id="d
             'total_domains_processed': results['successful']+results['failed'], 
             'email_used': email
         })
+        
+        # Finally remove from memory
+        if pid in user_processes:
+            del user_processes[pid]
     except Exception as e:
         logging.error(f"Process error: {e}")
-        user_processes[pid]['running'] = False
+        if pid in user_processes:
+            user_processes[pid]['running'] = False
+            user_processes[pid]['status'] = f"Error: {str(e)}"
 
 def run_subscription_process(username, email, domains, process_id="default", resume_state=None):
     threading.Thread(target=lambda: asyncio.run(run_subscription_process_async(username, email, domains, process_id, resume_state)), daemon=True).start()
