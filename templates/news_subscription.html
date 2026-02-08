@@ -63,6 +63,11 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
+                    {% if is_admin %}
+                    <button onclick="showSuccessfulDomains()" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg transition-colors flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>Successful Domains
+                    </button>
+                    {% endif %}
                     <div class="bg-white/20 px-3 py-2 rounded-lg">
                         <i class="fas fa-user-circle mr-2"></i>
                         <span class="font-medium">{{ current_user.name }}</span>
@@ -163,9 +168,150 @@
         <span id="toast-message"></span>
     </div>
 
+    <div id="successful-domains-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center" onclick="if(event.target===this)closeDomainsModal()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800 flex items-center">
+                        <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                        All Successful Domains
+                    </h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Total: <span id="domains-total-count" class="font-semibold text-green-600">0</span> domains
+                    </p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="copyAllDomains()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                        <i class="fas fa-copy mr-2"></i>Copy All
+                    </button>
+                    <button onclick="closeDomainsModal()" class="text-gray-400 hover:text-gray-600 p-2 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 border-b border-gray-100">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    <input type="text" id="domains-search" placeholder="Search domains..." 
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                           oninput="filterDomains()">
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4" id="domains-list-container">
+                <div id="domains-loading" class="flex items-center justify-center py-12">
+                    <i class="fas fa-spinner fa-spin text-3xl text-purple-500"></i>
+                </div>
+                <div id="domains-empty" class="hidden text-center py-12 text-gray-500">
+                    <i class="fas fa-inbox text-4xl mb-4 opacity-50"></i>
+                    <p>No successful domains found yet.</p>
+                </div>
+                <div id="domains-list" class="hidden space-y-1"></div>
+                <p id="domains-filtered-count" class="hidden text-sm text-gray-500 mt-3 text-center"></p>
+            </div>
+        </div>
+    </div>
+
     <script>
         let statusInterval = null;
         let historyInterval = null;
+        let allSuccessfulDomains = [];
+
+        async function showSuccessfulDomains() {
+            const modal = document.getElementById('successful-domains-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('domains-loading').classList.remove('hidden');
+            document.getElementById('domains-empty').classList.add('hidden');
+            document.getElementById('domains-list').classList.add('hidden');
+            document.getElementById('domains-filtered-count').classList.add('hidden');
+            document.getElementById('domains-search').value = '';
+            
+            try {
+                const response = await fetch('/api/news-subscription/successful-domains');
+                const data = await response.json();
+                
+                document.getElementById('domains-loading').classList.add('hidden');
+                
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    closeDomainsModal();
+                    return;
+                }
+                
+                allSuccessfulDomains = data.domains || [];
+                document.getElementById('domains-total-count').textContent = data.total.toLocaleString();
+                
+                if (allSuccessfulDomains.length === 0) {
+                    document.getElementById('domains-empty').classList.remove('hidden');
+                    return;
+                }
+                
+                renderDomainsList(allSuccessfulDomains);
+            } catch (error) {
+                document.getElementById('domains-loading').classList.add('hidden');
+                showToast('Failed to load successful domains.', 'error');
+                closeDomainsModal();
+            }
+        }
+
+        function renderDomainsList(domains) {
+            const list = document.getElementById('domains-list');
+            list.classList.remove('hidden');
+            list.innerHTML = domains.map((domain, i) => `
+                <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 group text-sm border-b border-gray-100 last:border-0">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-gray-400 font-mono text-xs w-8 text-right">${i + 1}.</span>
+                        <i class="fas fa-check-circle text-green-400 text-xs"></i>
+                        <span class="text-gray-700">${domain}</span>
+                    </div>
+                    <button onclick="copySingleDomain('${domain.replace(/'/g, "\\'")}')" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-all" title="Copy">
+                        <i class="fas fa-copy text-xs"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function filterDomains() {
+            const query = document.getElementById('domains-search').value.toLowerCase().trim();
+            const countEl = document.getElementById('domains-filtered-count');
+            
+            if (!query) {
+                renderDomainsList(allSuccessfulDomains);
+                countEl.classList.add('hidden');
+                return;
+            }
+            
+            const filtered = allSuccessfulDomains.filter(d => d.toLowerCase().includes(query));
+            renderDomainsList(filtered);
+            countEl.classList.remove('hidden');
+            countEl.textContent = `Showing ${filtered.length} of ${allSuccessfulDomains.length} domains`;
+        }
+
+        function copyAllDomains() {
+            if (allSuccessfulDomains.length === 0) {
+                showToast('No domains to copy.', 'error');
+                return;
+            }
+            navigator.clipboard.writeText(allSuccessfulDomains.join('\n')).then(() => {
+                showToast(`Copied ${allSuccessfulDomains.length} domains to clipboard!`, 'success');
+            }).catch(() => {
+                showToast('Failed to copy to clipboard.', 'error');
+            });
+        }
+
+        function copySingleDomain(domain) {
+            navigator.clipboard.writeText(domain).then(() => {
+                showToast(`Copied: ${domain}`, 'success');
+            }).catch(() => {
+                showToast('Failed to copy.', 'error');
+            });
+        }
+
+        function closeDomainsModal() {
+            const modal = document.getElementById('successful-domains-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
 
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');

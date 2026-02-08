@@ -3298,7 +3298,8 @@ def news_subscription():
     if not current_user.has_news_subscription_permission:
         flash('You do not have permission to access News Subscription.', 'error')
         return redirect(url_for('services'))
-    return render_template('news_subscription.html')
+    is_admin = has_user_management_permission(current_user.username)
+    return render_template('news_subscription.html', is_admin=is_admin)
 
 @app.route('/api/news-subscription/status')
 @login_required
@@ -3456,6 +3457,23 @@ def news_subscription_delete():
     
     delete_process_from_history(username, process_id)
     return jsonify({'success': True, 'message': 'Process deleted successfully'})
+
+@app.route('/api/news-subscription/successful-domains')
+@login_required
+def news_subscription_successful_domains():
+    if not has_user_management_permission(current_user.username):
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    domains = []
+    try:
+        if os.path.exists('all_successfully_domain.txt'):
+            with open('all_successfully_domain.txt', 'r', encoding='utf-8') as f:
+                domains = [line.strip() for line in f if line.strip()]
+    except Exception as e:
+        logging.error(f"Error reading successful domains: {e}")
+        return jsonify({'error': 'Failed to read domains file.'}), 500
+    
+    return jsonify({'domains': domains, 'total': len(domains)})
 
 
 ALL_PERMISSIONS = [
