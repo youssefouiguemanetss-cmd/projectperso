@@ -137,6 +137,20 @@ def stop_user_process(username, process_id='default'):
             process['running'] = False
             process['status'] = 'Stopped by user'
             
+            # Record end time and calculate duration
+            end_time = datetime.now()
+            start_time_str = process.get('start_time')
+            duration_str = "N/A"
+            if start_time_str:
+                try:
+                    start_time = datetime.fromisoformat(start_time_str)
+                    duration = end_time - start_time
+                    hours, remainder = divmod(duration.total_seconds(), 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    duration_str = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+                except Exception as e:
+                    logging.error(f"Error calculating duration: {e}")
+
             # Save to history immediately when stopped
             history_data = {
                 'id': process.get('id', process_id),
@@ -145,7 +159,10 @@ def stop_user_process(username, process_id='default'):
                 'successful_registrations': process.get('successful', 0),
                 'failed_registrations': process.get('failed', 0),
                 'success_rate': round((process.get('successful', 0) / max(process.get('progress', 1), 1)) * 100) if process.get('progress', 0) > 0 else 0,
-                'created_at': datetime.now().isoformat(),
+                'created_at': end_time.isoformat(),
+                'start_time': start_time_str,
+                'end_time': end_time.isoformat(),
+                'duration': duration_str,
                 'status': 'stopped'
             }
             add_process_to_history(username, history_data)
@@ -1078,7 +1095,8 @@ async def process_single_domain(p, domain, email, username, results, current_dom
             'successful': results['successful'],
             'failed': results['failed'],
             'paused': user_processes.get(pid, {}).get('paused', False),
-            'last_updated': datetime.now().isoformat()
+            'last_updated': datetime.now().isoformat(),
+            'start_time': user_processes.get(pid, {}).get('start_time')
         }
         save_process_state(username, state)
         
@@ -1117,7 +1135,8 @@ async def run_subscription_process_async(username, email, domains, process_id="d
         'successful': results['successful'],
         'failed': results['failed'],
         'current_domains': [],
-        'id': process_id
+        'id': process_id,
+        'start_time': resume_state.get('start_time', datetime.now().isoformat()) if resume_state else datetime.now().isoformat()
     }
     
     current_domains_set = set()
@@ -1138,13 +1157,32 @@ async def run_subscription_process_async(username, email, domains, process_id="d
             await asyncio.gather(*[wrap(d) for d in valid_domains])
             
         # Completion cleanup
+        end_time = datetime.now()
+        start_time_str = user_processes[pid].get('start_time')
+        duration_str = "N/A"
+        if start_time_str:
+            try:
+                start_time = datetime.fromisoformat(start_time_str)
+                duration = end_time - start_time
+                hours, remainder = divmod(duration.total_seconds(), 3600)
+                minutes, seconds = divmod(remainder, 60)
+                duration_str = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+            except Exception as e:
+                logging.error(f"Error calculating duration: {e}")
+
         delete_process_state(username, process_id)
         user_processes[pid]['running'] = False
         add_process_to_history(username, {
-            'status': 'completed', 'created_at': datetime.now().isoformat(),
-            'successful_registrations': results['successful'], 'failed_registrations': results['failed'],
+            'status': 'completed', 
+            'created_at': end_time.isoformat(),
+            'start_time': start_time_str,
+            'end_time': end_time.isoformat(),
+            'duration': duration_str,
+            'successful_registrations': results['successful'], 
+            'failed_registrations': results['failed'],
             'success_rate': round(results['successful']/(results['successful']+results['failed'])*100,1) if (results['successful']+results['failed'])>0 else 0,
-            'total_domains_processed': results['successful']+results['failed'], 'email_used': email
+            'total_domains_processed': results['successful']+results['failed'], 
+            'email_used': email
         })
     except Exception as e:
         logging.error(f"Process error: {e}")

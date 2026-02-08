@@ -3239,7 +3239,8 @@ def news_subscription_status():
                 pid = f"{username}:{process_id}"
                 if pid not in user_processes:
                     state = load_process_state(username, process_id)
-                    if state:
+                    # Check if the process was actually running or paused before resuming
+                    if state and (state.get('running', True) or state.get('paused')):
                         run_subscription_process(username, state['email'], state['domains'], process_id, state)
 
     active_processes = []

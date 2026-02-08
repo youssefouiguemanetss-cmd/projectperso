@@ -343,7 +343,7 @@
                                         <span class="${statusClass} px-2 py-1 rounded text-xs font-semibold">${statusText}</span>
                                         <span class="text-sm text-gray-500">${date}</span>
                                     </div>
-                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                                         <div>
                                             <span class="text-gray-500">Successful:</span>
                                             <span class="font-semibold text-green-600 ml-1">${item.successful_registrations || 0}</span>
@@ -360,9 +360,15 @@
                                             <span class="text-gray-500">Total:</span>
                                             <span class="font-semibold text-purple-600 ml-1">${item.total_domains_processed || 0}</span>
                                         </div>
+                                        <div>
+                                            <span class="text-gray-500">Duration:</span>
+                                            <span class="font-semibold text-indigo-600 ml-1">${item.duration || 'N/A'}</span>
+                                        </div>
                                     </div>
                                     <div class="mt-2 text-sm text-gray-500">
                                         <i class="fas fa-envelope mr-1"></i> ${item.email_used || 'N/A'}
+                                        <span class="ml-3"><i class="fas fa-calendar-alt mr-1"></i> Start: ${item.start_time ? new Date(item.start_time).toLocaleString() : 'N/A'}</span>
+                                        <span class="ml-3"><i class="fas fa-flag-checkered mr-1"></i> End: ${item.end_time ? new Date(item.end_time).toLocaleString() : 'N/A'}</span>
                                         ${item.invalid_domains ? `<span class="ml-3"><i class="fas fa-exclamation-triangle mr-1 text-yellow-500"></i> ${item.invalid_domains} invalid domains skipped</span>` : ''}
                                     </div>
                                 </div>
