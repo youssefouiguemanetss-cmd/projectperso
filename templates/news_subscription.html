@@ -78,6 +78,28 @@
     <main class="container mx-auto px-4 py-8 max-w-6xl">
         <div id="processes-container"></div>
 
+        <div id="quota-info-banner" class="hidden mb-4">
+            <div class="card-glass rounded-xl shadow-md p-4 border border-yellow-200 bg-yellow-50">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-chart-pie text-yellow-600 text-lg"></i>
+                        <span class="text-sm font-medium text-gray-700">Monthly Domain Quota:</span>
+                        <span id="quota-used" class="text-sm font-bold text-gray-800">0</span>
+                        <span class="text-sm text-gray-500">/</span>
+                        <span id="quota-total" class="text-sm font-bold text-gray-800">0</span>
+                        <span class="text-sm text-gray-500">domains</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-600">Remaining:</span>
+                        <span id="quota-remaining" class="text-sm font-bold text-green-600">0</span>
+                    </div>
+                </div>
+                <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+                    <div id="quota-progress-bar" class="bg-yellow-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
         <div id="start-process-view">
             <div class="card-glass rounded-2xl shadow-xl p-8 mb-8">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">
@@ -186,8 +208,25 @@
                 const container = document.getElementById('processes-container');
                 const startView = document.getElementById('start-process-view');
                 
+                if (data.domain_quota > 0) {
+                    const qBanner = document.getElementById('quota-info-banner');
+                    qBanner.classList.remove('hidden');
+                    document.getElementById('quota-used').textContent = data.domains_processed.toLocaleString();
+                    document.getElementById('quota-total').textContent = data.domain_quota.toLocaleString();
+                    const rem = data.domains_remaining < 0 ? 'Unlimited' : data.domains_remaining.toLocaleString();
+                    document.getElementById('quota-remaining').textContent = rem;
+                    const pct = Math.min(100, Math.round((data.domains_processed / data.domain_quota) * 100));
+                    document.getElementById('quota-progress-bar').style.width = pct + '%';
+                    if (pct > 80) document.getElementById('quota-progress-bar').classList.replace('bg-yellow-500', 'bg-red-500');
+                } else {
+                    document.getElementById('quota-info-banner').classList.add('hidden');
+                }
+
+                const canStartMore = data.infinity || (data.processes ? data.processes.length < data.max_processes : true);
+
                 if (data.processes && data.processes.length > 0) {
-                    if (!data.infinity) startView.style.display = 'none';
+                    if (!canStartMore) startView.style.display = 'none';
+                    else startView.style.display = 'block';
                     container.innerHTML = data.processes.map(p => renderProcess(p)).join('');
                     if (!statusInterval) statusInterval = setInterval(checkStatus, 1500);
                 } else {

@@ -211,3 +211,16 @@
 [x] 162. Verified application running successfully - workflow status: RUNNING, gunicorn listening on port 5000
 [x] 163. Screenshot confirmed TSS Gmail Access login page displays correctly
 [x] 164. Import migration to Replit environment completed - Feb 08, 2026 - all items marked as done
+[x] 165. User Management Feature - Feb 08, 2026:
+    - Added "Manage Users" service visible to users with "user_management" permission
+    - User CRUD: Add, Edit, Delete users with entity, name, username, password
+    - Permission management: Toggle all service permissions per user via UI chips
+    - News Subscription limits: Set max concurrent processes per user
+    - Domain quota: Monthly domain processing quota with usage tracking (user_quotas.json)
+    - Quota banner: Users see remaining domains in News Subscription page
+    - Process limit enforcement: Non-infinity users limited by max_processes setting
+    - Domain quota enforcement: Users blocked when monthly quota exhausted
+    - Quota reset: Automatic monthly reset + manual reset button for admins
+    - Comma validation: Prevents commas in user fields to protect CSV format
+    - Monthly quota persistence: Reset persisted to disk on load
+    - Added user_management permission to redouan and y.ouiguemane users

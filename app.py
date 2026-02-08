@@ -147,11 +147,10 @@ def load_user(user_id):
     return None
 
 def load_users_from_file():
-    """Load users from users.txt file with format: entity,Name,username,password,permissions,max_processes,domain_quota,domains_processed_this_month"""
+    """Load users from users.txt file with format: entity,Name,username,password[,permissions]"""
     users = []
+    quotas = load_user_quotas()
     try:
-        if not os.path.exists('users.txt'):
-            return users
         with open('users.txt', 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
@@ -163,47 +162,114 @@ def load_users_from_file():
                             name = parts[1].strip()
                             username = parts[2].strip()
                             password = parts[3].strip()
-                            permissions = []
-                            if len(parts) > 4 and parts[4].strip():
-                                permissions = [p.strip() for p in parts[4].split(';') if p.strip()] if ';' in parts[4] else [p.strip() for p in parts[4].split(' ') if p.strip()]
-                                if not permissions and parts[4].strip(): # Fallback for old comma format or single permission
-                                     permissions = [p.strip() for p in parts[4:] if not p.strip().isdigit()]
-                            
-                            # Quota and process fields
-                            max_processes = 1
-                            domain_quota = 0
-                            domains_processed = 0
-                            
-                            # Try to find numeric values at the end of the line
-                            numeric_parts = [p.strip() for p in parts if p.strip().isdigit()]
-                            if len(numeric_parts) >= 3:
-                                max_processes = int(numeric_parts[-3])
-                                domain_quota = int(numeric_parts[-2])
-                                domains_processed = int(numeric_parts[-1])
-                            elif len(numeric_parts) == 2:
-                                max_processes = int(numeric_parts[-2])
-                                domain_quota = int(numeric_parts[-1])
-                            elif len(numeric_parts) == 1:
-                                max_processes = int(numeric_parts[-1])
-
+                            permissions = [p.strip() for p in parts[4:]] if len(parts) > 4 else []
+                            has_toggle = 'ok' in permissions
+                            has_news = 'allow_add_gmail_of_news' in permissions
+                            has_domain_checker = 'Domain_checker' in permissions
+                            has_find_news = 'find_news' in permissions
+                            has_extract_emails = 'Extract_emails' in permissions
+                            has_tssw_report = 'tssw_report' in permissions
+                            has_gmass = 'gmass' in permissions
+                            has_blacklist_lookup = 'blacklist_lookup' in permissions
+                            user_quota = quotas.get(username, {})
                             users.append({
-                                'entity': entity, 'name': name, 'username': username, 'password': password,
-                                'permissions': permissions, 'max_processes': max_processes,
-                                'domain_quota': domain_quota, 'domains_processed_this_month': domains_processed,
-                                'has_toggle_permission': 'ok' in permissions,
-                                'has_news_permission': 'allow_add_gmail_of_news' in permissions,
-                                'has_domain_checker_permission': 'Domain_checker' in permissions,
-                                'has_find_news_permission': 'find_news' in permissions,
-                                'has_extract_emails_permission': 'Extract_emails' in permissions,
-                                'has_tssw_report_permission': 'tssw_report' in permissions,
-                                'has_gmass_permission': 'gmass' in permissions,
-                                'has_blacklist_lookup_permission': 'blacklist_lookup' in permissions
+                                'entity': entity,
+                                'name': name,
+                                'username': username,
+                                'password': password,
+                                'permissions': permissions,
+                                'max_processes': user_quota.get('max_processes', 1),
+                                'domain_quota': user_quota.get('domain_quota', 0),
+                                'domains_processed_this_month': user_quota.get('domains_processed_this_month', 0),
+                                'has_toggle_permission': has_toggle,
+                                'has_news_permission': has_news,
+                                'has_domain_checker_permission': has_domain_checker,
+                                'has_find_news_permission': has_find_news,
+                                'has_extract_emails_permission': has_extract_emails,
+                                'has_tssw_report_permission': has_tssw_report,
+                                'has_gmass_permission': has_gmass,
+                                'has_blacklist_lookup_permission': has_blacklist_lookup
                             })
+                        else:
+                            logging.warning(f"Invalid format in users.txt line {line_num}: {line}")
                     except Exception as e:
                         logging.error(f"Error parsing users.txt line {line_num}: {e}")
+    except FileNotFoundError:
+        logging.error("users.txt file not found")
     except Exception as e:
         logging.error(f"Error reading users.txt: {e}")
+    
     return users
+
+USER_QUOTAS_FILE = 'user_quotas.json'
+
+def load_user_quotas():
+    """Load user quotas from JSON file, reset monthly counters if needed"""
+    try:
+        if os.path.exists(USER_QUOTAS_FILE):
+            with open(USER_QUOTAS_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                current_month = datetime.now().strftime('%Y-%m')
+                changed = False
+                for username, q in data.items():
+                    if q.get('quota_month', '') != current_month:
+                        q['domains_processed_this_month'] = 0
+                        q['quota_month'] = current_month
+                        changed = True
+                if changed:
+                    save_user_quotas(data)
+                return data
+    except Exception as e:
+        logging.error(f"Error loading user quotas: {e}")
+    return {}
+
+def save_user_quotas(quotas):
+    """Save user quotas to JSON file"""
+    try:
+        with open(USER_QUOTAS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(quotas, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Error saving user quotas: {e}")
+
+def update_user_domains_processed(username, count):
+    """Increment the domains processed count for a user"""
+    quotas = load_user_quotas()
+    current_month = datetime.now().strftime('%Y-%m')
+    if username not in quotas:
+        quotas[username] = {'max_processes': 1, 'domain_quota': 0, 'domains_processed_this_month': 0, 'quota_month': current_month}
+    if quotas[username].get('quota_month', '') != current_month:
+        quotas[username]['domains_processed_this_month'] = 0
+        quotas[username]['quota_month'] = current_month
+    quotas[username]['domains_processed_this_month'] += count
+    save_user_quotas(quotas)
+    return quotas[username]['domains_processed_this_month']
+
+def get_user_remaining_domains(username):
+    """Get remaining domain quota for a user. Returns -1 if unlimited."""
+    quotas = load_user_quotas()
+    user_quota = quotas.get(username, {})
+    domain_quota = user_quota.get('domain_quota', 0)
+    if domain_quota == 0:
+        return -1
+    current_month = datetime.now().strftime('%Y-%m')
+    if user_quota.get('quota_month', '') != current_month:
+        return domain_quota
+    processed = user_quota.get('domains_processed_this_month', 0)
+    return max(0, domain_quota - processed)
+
+def save_users_to_file(users_list):
+    """Save users list back to users.txt"""
+    try:
+        with open('users.txt', 'w', encoding='utf-8') as f:
+            f.write('# Format: entity,Name,username,password[,permissions]\n')
+            f.write('# Permissions can be: ok, allow_add_gmail_of_news (or both separated by comma)\n')
+            for u in users_list:
+                parts = [u['entity'], u['name'], u['username'], u['password']]
+                if u.get('permissions'):
+                    parts.extend(u['permissions'])
+                f.write(','.join(parts) + '\n')
+    except Exception as e:
+        logging.error(f"Error saving users.txt: {e}")
 
 def get_user_accounts(user_entity):
     """Get Gmail accounts accessible to a user based on their entity"""
@@ -3275,9 +3341,20 @@ def news_subscription_status():
                 'current_domains': p.get('current_domains', [])
             })
     
+    quotas = load_user_quotas()
+    user_quota = quotas.get(username, {})
+    domain_quota = user_quota.get('domain_quota', 0)
+    domains_processed = user_quota.get('domains_processed_this_month', 0)
+    remaining = get_user_remaining_domains(username)
+    max_procs = user_quota.get('max_processes', 1)
+    
     return jsonify({
         'processes': active_processes,
-        'infinity': infinity
+        'infinity': infinity,
+        'max_processes': max_procs,
+        'domain_quota': domain_quota,
+        'domains_processed': domains_processed,
+        'domains_remaining': remaining
     })
 
 @app.route('/api/news-subscription/start', methods=['POST'])
@@ -3292,13 +3369,19 @@ def news_subscription_start():
     infinity = is_infinity_process(username)
     
     active = [pid for pid, p in user_processes.items() if pid.startswith(f"{username}:") and p.get('running')]
-    if not infinity and active:
-        return jsonify({'error': 'A process is already running.'}), 400
+    
+    quotas = load_user_quotas()
+    user_quota = quotas.get(username, {})
+    max_procs = user_quota.get('max_processes', 1)
+    
+    if not infinity:
+        if len(active) >= max_procs:
+            return jsonify({'error': f'Process limit reached ({max_procs}). Stop a running process first.'}), 400
     
     data = request.get_json()
     email = data.get('email', '').strip()
     domains_text = data.get('domains', '')
-    process_id = str(int(time.time())) if infinity else "default"
+    process_id = str(int(time.time())) if (infinity or max_procs > 1) else "default"
     
     if not email or '@' not in email:
         return jsonify({'error': 'Invalid email.'}), 400
@@ -3306,6 +3389,15 @@ def news_subscription_start():
     domains = [d.strip() for d in domains_text.strip().split('\n') if d.strip()]
     if not domains:
         return jsonify({'error': 'No domains.'}), 400
+    
+    domain_quota = user_quota.get('domain_quota', 0)
+    if domain_quota > 0:
+        remaining = get_user_remaining_domains(username)
+        if remaining == 0:
+            return jsonify({'error': 'Monthly domain quota exhausted. Contact your administrator.'}), 400
+        if len(domains) > remaining:
+            return jsonify({'error': f'You can only process {remaining} more domains this month. You submitted {len(domains)}.'}), 400
+        update_user_domains_processed(username, len(domains))
     
     run_subscription_process(username, email, domains, process_id)
     return jsonify({'success': True, 'process_id': process_id})
@@ -3365,6 +3457,192 @@ def news_subscription_delete():
     delete_process_from_history(username, process_id)
     return jsonify({'success': True, 'message': 'Process deleted successfully'})
 
+
+ALL_PERMISSIONS = [
+    ('ok', 'Toggle'),
+    ('allow_add_gmail_of_news', 'Add Gmail of News'),
+    ('Domain_checker', 'Domain Checker'),
+    ('find_news', 'Find News'),
+    ('Extract_emails', 'Extract Emails'),
+    ('tssw_report', 'TSSW Report'),
+    ('gmass', 'TSS Gmail Access'),
+    ('blacklist_lookup', 'Blacklist Lookup'),
+    ('download_extension', 'Download Extensions'),
+    ('add_extensions', 'Add Extensions'),
+    ('quality_helper', 'Quality Seeds Helper'),
+    ('news_sign_subsctiption', 'News Subscription'),
+    ('infinity-process', 'Unlimited Processes'),
+    ('user_management', 'User Management'),
+]
+
+@app.route('/manage-users')
+@login_required
+def manage_users():
+    if not current_user.has_user_management_permission:
+        flash('You do not have permission to access this page.', 'error')
+        return redirect(url_for('services'))
+    users = load_users_from_file()
+    quotas = load_user_quotas()
+    return render_template('manage_users.html', users=users, quotas=quotas, all_permissions=ALL_PERMISSIONS)
+
+@app.route('/api/manage-users/list')
+@login_required
+def manage_users_list():
+    if not current_user.has_user_management_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    users = load_users_from_file()
+    quotas = load_user_quotas()
+    users_data = []
+    for u in users:
+        uq = quotas.get(u['username'], {})
+        users_data.append({
+            'entity': u['entity'],
+            'name': u['name'],
+            'username': u['username'],
+            'permissions': u['permissions'],
+            'max_processes': uq.get('max_processes', 1),
+            'domain_quota': uq.get('domain_quota', 0),
+            'domains_processed_this_month': uq.get('domains_processed_this_month', 0),
+        })
+    return jsonify({'users': users_data})
+
+@app.route('/api/manage-users/add', methods=['POST'])
+@login_required
+def manage_users_add():
+    if not current_user.has_user_management_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    entity = data.get('entity', '').strip()
+    name = data.get('name', '').strip()
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    permissions = data.get('permissions', [])
+    max_processes = int(data.get('max_processes', 1))
+    domain_quota = int(data.get('domain_quota', 0))
+    
+    if not entity or not name or not username or not password:
+        return jsonify({'error': 'Entity, Name, Username, and Password are required.'}), 400
+
+    for field_name, field_val in [('Entity', entity), ('Name', name), ('Username', username), ('Password', password)]:
+        if ',' in field_val:
+            return jsonify({'error': f'{field_name} must not contain commas.'}), 400
+
+    users = load_users_from_file()
+    for u in users:
+        if u['username'] == username:
+            return jsonify({'error': f'Username "{username}" already exists.'}), 400
+
+    with open('users.txt', 'a', encoding='utf-8') as f:
+        parts = [entity, name, username, password] + permissions
+        f.write(','.join(parts) + '\n')
+
+    quotas = load_user_quotas()
+    quotas[username] = {
+        'max_processes': max_processes,
+        'domain_quota': domain_quota,
+        'domains_processed_this_month': 0,
+        'quota_month': datetime.now().strftime('%Y-%m')
+    }
+    save_user_quotas(quotas)
+    return jsonify({'success': True, 'message': f'User "{name}" added successfully.'})
+
+@app.route('/api/manage-users/update', methods=['POST'])
+@login_required
+def manage_users_update():
+    if not current_user.has_user_management_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    target_username = data.get('target_username', '').strip()
+    entity = data.get('entity', '').strip()
+    name = data.get('name', '').strip()
+    new_username = data.get('new_username', '').strip()
+    password = data.get('password', '').strip()
+    permissions = data.get('permissions', [])
+    max_processes = int(data.get('max_processes', 1))
+    domain_quota = int(data.get('domain_quota', 0))
+
+    if not entity or not name or not new_username:
+        return jsonify({'error': 'Entity, Name, and Username are required.'}), 400
+
+    for field_name, field_val in [('Entity', entity), ('Name', name), ('Username', new_username)]:
+        if ',' in field_val:
+            return jsonify({'error': f'{field_name} must not contain commas.'}), 400
+    if password and ',' in password:
+        return jsonify({'error': 'Password must not contain commas.'}), 400
+
+    users = load_users_from_file()
+    found = False
+    existing_password = ''
+    for u in users:
+        if u['username'] == target_username:
+            existing_password = u['password']
+            if new_username != target_username:
+                for other in users:
+                    if other['username'] == new_username and other['username'] != target_username:
+                        return jsonify({'error': f'Username "{new_username}" already exists.'}), 400
+            u['entity'] = entity
+            u['name'] = name
+            u['username'] = new_username
+            u['password'] = password if password else existing_password
+            u['permissions'] = permissions
+            found = True
+            break
+    if not found:
+        return jsonify({'error': 'User not found.'}), 404
+
+    save_users_to_file(users)
+
+    quotas = load_user_quotas()
+    old_quota = quotas.pop(target_username, {})
+    quotas[new_username] = {
+        'max_processes': max_processes,
+        'domain_quota': domain_quota,
+        'domains_processed_this_month': old_quota.get('domains_processed_this_month', 0),
+        'quota_month': old_quota.get('quota_month', datetime.now().strftime('%Y-%m'))
+    }
+    save_user_quotas(quotas)
+    return jsonify({'success': True, 'message': f'User "{name}" updated successfully.'})
+
+@app.route('/api/manage-users/delete', methods=['POST'])
+@login_required
+def manage_users_delete():
+    if not current_user.has_user_management_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    target_username = data.get('username', '').strip()
+
+    if not target_username:
+        return jsonify({'error': 'Username is required.'}), 400
+    if target_username == current_user.username:
+        return jsonify({'error': 'You cannot delete yourself.'}), 400
+
+    users = load_users_from_file()
+    new_users = [u for u in users if u['username'] != target_username]
+    if len(new_users) == len(users):
+        return jsonify({'error': 'User not found.'}), 404
+    
+    save_users_to_file(new_users)
+
+    quotas = load_user_quotas()
+    quotas.pop(target_username, None)
+    save_user_quotas(quotas)
+    return jsonify({'success': True, 'message': f'User "{target_username}" deleted.'})
+
+@app.route('/api/manage-users/reset-quota', methods=['POST'])
+@login_required
+def manage_users_reset_quota():
+    if not current_user.has_user_management_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    target_username = data.get('username', '').strip()
+    if not target_username:
+        return jsonify({'error': 'Username is required.'}), 400
+    quotas = load_user_quotas()
+    if target_username in quotas:
+        quotas[target_username]['domains_processed_this_month'] = 0
+        quotas[target_username]['quota_month'] = datetime.now().strftime('%Y-%m')
+        save_user_quotas(quotas)
+    return jsonify({'success': True, 'message': f'Quota reset for "{target_username}".'})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
