@@ -61,6 +61,7 @@ def setup_logging():
         werkzeug_logger.propagate = False
         app._logging_setup_done = True
 from connection_manager import gmail_manager
+import ip_checker
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -111,6 +112,8 @@ class User(UserMixin):
         self.has_quality_helper_permission = False
         self.has_news_subscription_permission = False
         self.has_user_management_permission = False
+        self.has_ips_cheker_permission = False
+        self.has_add_ip_cheker_permission = False
         self.max_processes = 1  # Default limit
         self.domain_quota = 0   # Default quota (0 means unlimited or not set)
         self.domains_processed_this_month = 0
@@ -140,6 +143,8 @@ def load_user(user_id):
             user.has_quality_helper_permission = 'quality_helper' in permissions
             user.has_news_subscription_permission = 'news_sign_subsctiption' in permissions
             user.has_user_management_permission = 'user_management' in permissions
+            user.has_ips_cheker_permission = 'ips_cheker' in permissions
+            user.has_add_ip_cheker_permission = 'add_ip_cheker' in permissions
             user.max_processes = user_data.get('max_processes', 1)
             user.domain_quota = user_data.get('domain_quota', 0)
             user.domains_processed_this_month = user_data.get('domains_processed_this_month', 0)
@@ -3476,6 +3481,256 @@ def news_subscription_successful_domains():
     return jsonify({'domains': domains, 'total': len(domains)})
 
 
+@app.route('/ip-checker')
+@login_required
+def ip_checker_page():
+    if not current_user.has_ips_cheker_permission:
+        flash('You do not have permission to access IPs Checker.', 'error')
+        return redirect(url_for('services'))
+    can_manage = current_user.has_add_ip_cheker_permission
+    return render_template('ip_checker.html', can_manage=can_manage)
+
+
+@app.route('/api/ip-checker/servers')
+@login_required
+def ip_checker_servers():
+    if not current_user.has_ips_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = ip_checker.load_servers()
+    events = ip_checker.load_events()
+    servers = {}
+    for sname, sdata in data.items():
+        classes = {}
+        for cname, cdata in sdata['classes'].items():
+            classes[cname] = {
+                'cidr': cdata['cidr'],
+                'ips': cdata['ips'],
+                'ip_count': len(cdata['ips']),
+                'created_at': cdata.get('created_at', '')
+            }
+        server_events = [e for e in events if e.get('server') == sname]
+        servers[sname] = {
+            'classes': classes,
+            'created_at': sdata.get('created_at', ''),
+            'events': server_events[:20]
+        }
+    return jsonify({'servers': servers})
+
+
+@app.route('/api/ip-checker/server/add', methods=['POST'])
+@login_required
+def ip_checker_add_server():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'Server name is required.'}), 400
+    ok, msg = ip_checker.add_server(name)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/server/delete', methods=['POST'])
+@login_required
+def ip_checker_delete_server():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'Server name is required.'}), 400
+    ok, msg = ip_checker.delete_server(name)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/server/rename', methods=['POST'])
+@login_required
+def ip_checker_rename_server():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    old_name = data.get('old_name', '').strip()
+    new_name = data.get('new_name', '').strip()
+    if not old_name or not new_name:
+        return jsonify({'error': 'Both old and new names are required.'}), 400
+    ok, msg = ip_checker.rename_server(old_name, new_name)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/class/add', methods=['POST'])
+@login_required
+def ip_checker_add_class():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    server = data.get('server', '').strip()
+    class_name = data.get('class_name', '').strip()
+    cidr = data.get('cidr', '').strip()
+    if not server or not class_name or not cidr:
+        return jsonify({'error': 'Server, class name, and CIDR are required.'}), 400
+    ok, msg = ip_checker.add_class_to_server(server, class_name, cidr)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/class/edit', methods=['POST'])
+@login_required
+def ip_checker_edit_class():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    server = data.get('server', '').strip()
+    old_name = data.get('old_class_name', '').strip()
+    new_name = data.get('new_class_name', '').strip()
+    new_cidr = data.get('new_cidr', '').strip()
+    if not server or not old_name or not new_name or not new_cidr:
+        return jsonify({'error': 'All fields are required.'}), 400
+    ok, msg = ip_checker.edit_class(server, old_name, new_name, new_cidr)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/class/delete', methods=['POST'])
+@login_required
+def ip_checker_delete_class():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    server = data.get('server', '').strip()
+    class_name = data.get('class_name', '').strip()
+    if not server or not class_name:
+        return jsonify({'error': 'Server and class name are required.'}), 400
+    ok, msg = ip_checker.delete_class_from_server(server, class_name)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/ips/add', methods=['POST'])
+@login_required
+def ip_checker_add_ips():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    server = data.get('server', '').strip()
+    class_name = data.get('class_name', '').strip()
+    ips_text = data.get('ips', '').strip()
+    if not server or not class_name or not ips_text:
+        return jsonify({'error': 'Server, class, and IPs are required.'}), 400
+    ip_list = [ip.strip() for ip in ips_text.split('\n') if ip.strip()]
+    if not ip_list:
+        return jsonify({'error': 'No valid IPs provided.'}), 400
+    ok, msg, results = ip_checker.add_ips_to_class(server, class_name, ip_list)
+    return jsonify({'success': ok, 'message': msg, 'results': results})
+
+
+@app.route('/api/ip-checker/ip/delete', methods=['POST'])
+@login_required
+def ip_checker_delete_ip():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    server = data.get('server', '').strip()
+    class_name = data.get('class_name', '').strip()
+    ip_str = data.get('ip', '').strip()
+    if not server or not class_name or not ip_str:
+        return jsonify({'error': 'Server, class, and IP are required.'}), 400
+    ok, msg = ip_checker.delete_ip_from_class(server, class_name, ip_str)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/search', methods=['POST'])
+@login_required
+def ip_checker_search():
+    if not current_user.has_ips_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    ip_str = data.get('ip', '').strip()
+    if not ip_str:
+        return jsonify({'error': 'IP address is required.'}), 400
+    ok, msg, results = ip_checker.search_ip(ip_str)
+    return jsonify({'success': ok, 'message': msg, 'results': results})
+
+
+@app.route('/api/ip-checker/event/add', methods=['POST'])
+@login_required
+def ip_checker_add_event():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    server = data.get('server', '').strip()
+    event_type = data.get('event_type', '').strip()
+    scope = data.get('scope', '').strip()
+    class_name = data.get('class_name', '').strip() or None
+    ips = data.get('ips', [])
+    if not server or not event_type or not scope:
+        return jsonify({'error': 'Server, event type, and scope are required.'}), 400
+    if scope not in ('server', 'class', 'ip'):
+        return jsonify({'error': 'Invalid scope.'}), 400
+    if scope == 'class' and not class_name:
+        return jsonify({'error': 'Class name is required for class scope.'}), 400
+    if scope == 'ip' and not ips:
+        return jsonify({'error': 'At least one IP is required for IP scope.'}), 400
+    ok, msg, event = ip_checker.add_event(server, event_type, scope, class_name, ips, current_user.name)
+    return jsonify({'success': ok, 'message': msg, 'event': event})
+
+
+@app.route('/api/ip-checker/event/delete', methods=['POST'])
+@login_required
+def ip_checker_delete_event():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    event_id = data.get('event_id', '').strip()
+    if not event_id:
+        return jsonify({'error': 'Event ID is required.'}), 400
+    ok, msg = ip_checker.delete_event(event_id)
+    return jsonify({'success': ok, 'message': msg})
+
+
+@app.route('/api/ip-checker/event-types')
+@login_required
+def ip_checker_event_types():
+    if not current_user.has_ips_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    types = ip_checker.load_event_types()
+    return jsonify({'event_types': types})
+
+
+@app.route('/api/ip-checker/event-types/add', methods=['POST'])
+@login_required
+def ip_checker_add_event_type():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'Event type name is required.'}), 400
+    ok, msg = ip_checker.add_custom_event_type(name)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/event-types/delete', methods=['POST'])
+@login_required
+def ip_checker_delete_event_type():
+    if not current_user.has_add_ip_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'Event type name is required.'}), 400
+    ok, msg = ip_checker.delete_event_type(name)
+    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+
+
+@app.route('/api/ip-checker/events')
+@login_required
+def ip_checker_get_events():
+    if not current_user.has_ips_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    server = request.args.get('server', '').strip()
+    events = ip_checker.load_events()
+    if server:
+        events = [e for e in events if e.get('server') == server]
+    return jsonify({'events': events[:100]})
+
+
 ALL_PERMISSIONS = [
     ('ok', 'Toggle'),
     ('allow_add_gmail_of_news', 'Add Gmail of News'),
@@ -3491,6 +3746,8 @@ ALL_PERMISSIONS = [
     ('news_sign_subsctiption', 'News Subscription'),
     ('infinity-process', 'Unlimited Processes'),
     ('user_management', 'User Management'),
+    ('ips_cheker', 'IPs Checker'),
+    ('add_ip_cheker', 'Add/Manage IPs'),
 ]
 
 @app.route('/manage-users')

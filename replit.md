@@ -32,6 +32,7 @@ The platform includes several services:
 - **TSSW Rapport**: A dedicated reporting service for TSSW users.
 - **Find News**: Service with Gmail account management capabilities.
 - **TSS Extract Emails**: Advanced email analysis, SPF/DKIM status, sender IP extraction, and CSV export.
+- **IPs Checker**: Server and IP address management with CIDR class validation, event tracking (Available/Down/custom), IP search/lookup, and event history. Data stored in JSON files (`ip_checker_data.json`, `ip_checker_events.json`, `ip_checker_event_types.json`). Two permissions: `ips_cheker` (view/search) and `add_ip_cheker` (full CRUD management).
 
 # External Dependencies
 

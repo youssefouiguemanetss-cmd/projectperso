@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPs Checker - TSS Services</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); }
+        .card-glass { background: rgba(255,255,255,0.97); backdrop-filter: blur(10px); }
+        .server-card { transition: all 0.3s ease; border-left: 4px solid #3b82f6; }
+        .server-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(59,130,246,0.15); }
+        .class-badge { transition: all 0.2s ease; }
+        .class-badge:hover { transform: scale(1.02); }
+        .event-available { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .event-down { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        .event-custom { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+        .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .search-result { animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .ip-tag { transition: all 0.2s; }
+        .ip-tag:hover { transform: scale(1.05); }
+        .tab-active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: 600; }
+        .tab-inactive { border-bottom: 3px solid transparent; color: #6b7280; }
+        .tab-inactive:hover { color: #374151; border-color: #d1d5db; }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('services') }}" class="hover:bg-white/20 p-2 rounded-lg transition-colors">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                    </a>
+                    <div>
+                        <h1 class="text-2xl font-bold flex items-center">
+                            <i class="fas fa-network-wired mr-3"></i>
+                            IPs Checker
+                        </h1>
+                        <p class="text-sm opacity-80">Manage servers, IP classes, and track events</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white/20 px-3 py-2 rounded-lg">
+                        <i class="fas fa-user-circle mr-2"></i>
+                        <span class="font-medium">{{ current_user.name }}</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-6 max-w-7xl">
+        <div class="card-glass rounded-2xl shadow-xl p-6 mb-6">
+            <div class="flex flex-col md:flex-row items-center gap-4">
+                <div class="flex-1 relative w-full">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="search-ip-input" placeholder="Search by IP address (e.g. 154.23.60.15)..."
+                           class="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg transition-all"
+                           onkeydown="if(event.key==='Enter')searchIP()">
+                </div>
+                <button onclick="searchIP()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors flex items-center">
+                    <i class="fas fa-search mr-2"></i>Search
+                </button>
+            </div>
+            <div id="search-results" class="mt-4 hidden"></div>
+        </div>
+
+        <div class="flex border-b border-gray-200 mb-6">
+            <button onclick="switchTab('servers')" id="tab-servers" class="px-6 py-3 text-sm font-medium tab-active transition-all">
+                <i class="fas fa-server mr-2"></i>Servers & IPs
+            </button>
+            <button onclick="switchTab('events')" id="tab-events" class="px-6 py-3 text-sm font-medium tab-inactive transition-all">
+                <i class="fas fa-calendar-alt mr-2"></i>Event History
+            </button>
+            {% if can_manage %}
+            <button onclick="switchTab('manage-events')" id="tab-manage-events" class="px-6 py-3 text-sm font-medium tab-inactive transition-all">
+                <i class="fas fa-cog mr-2"></i>Event Types
+            </button>
+            {% endif %}
+        </div>
+
+        <div id="panel-servers">
+            {% if can_manage %}
+            <div class="flex justify-end mb-4">
+                <button onclick="showAddServerModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors shadow-md">
+                    <i class="fas fa-plus mr-2"></i>Add Server
+                </button>
+            </div>
+            {% endif %}
+            <div id="servers-container">
+                <div class="text-center py-12 text-gray-400">
+                    <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
+                    <p>Loading servers...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-events" class="hidden">
+            <div class="card-glass rounded-2xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-history mr-2 text-blue-500"></i>Event History</h2>
+                    <div class="flex items-center gap-3">
+                        <select id="event-filter-server" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" onchange="loadEvents()">
+                            <option value="">All Servers</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="events-list">
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-3"></i>
+                        <p>Loading events...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if can_manage %}
+        <div id="panel-manage-events" class="hidden">
+            <div class="card-glass rounded-2xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-tags mr-2 text-purple-500"></i>Event Types</h2>
+                    <button onclick="showAddEventTypeModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Add Type
+                    </button>
+                </div>
+                <div id="event-types-list" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <div id="modal-overlay" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center" onclick="if(event.target===this)closeAllModals()">
+        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"></div>
+    </div>
+
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-full opacity-0 transition-all duration-300 z-[60]">
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        const CAN_MANAGE = {{ 'true' if can_manage else 'false' }};
+        let serversData = {};
+        let eventTypesCache = [];
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            msg.textContent = message;
+            toast.className = 'fixed bottom-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-[60]';
+            toast.classList.add(type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-green-600' : 'bg-gray-800');
+            toast.classList.remove('translate-y-full', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-full', 'opacity-0'), 3500);
+        }
+
+        function switchTab(tab) {
+            ['servers', 'events', 'manage-events'].forEach(t => {
+                const panel = document.getElementById('panel-' + t);
+                const tabBtn = document.getElementById('tab-' + t);
+                if (panel) panel.classList.toggle('hidden', t !== tab);
+                if (tabBtn) { tabBtn.className = tabBtn.className.replace(/tab-\w+/, t === tab ? 'tab-active' : 'tab-inactive'); }
+            });
+            if (tab === 'events') loadEvents();
+            if (tab === 'manage-events') loadEventTypes();
+        }
+
+        function showModal(html) {
+            document.getElementById('modal-content').innerHTML = html;
+            const m = document.getElementById('modal-overlay');
+            m.classList.remove('hidden'); m.classList.add('flex');
+        }
+        function closeAllModals() {
+            const m = document.getElementById('modal-overlay');
+            m.classList.add('hidden'); m.classList.remove('flex');
+        }
+
+        async function loadServers() {
+            try {
+                const res = await fetch('/api/ip-checker/servers');
+                const data = await res.json();
+                if (data.error) { showToast(data.error, 'error'); return; }
+                serversData = data.servers;
+                renderServers();
+                populateServerFilter();
+            } catch (e) { showToast('Failed to load servers.', 'error'); }
+        }
+
+        function populateServerFilter() {
+            const sel = document.getElementById('event-filter-server');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">All Servers</option>';
+            Object.keys(serversData).sort().forEach(s => {
+                sel.innerHTML += `<option value="${s}" ${s===current?'selected':''}>${s}</option>`;
+            });
+        }
+
+        function renderServers() {
+            const container = document.getElementById('servers-container');
+            const names = Object.keys(serversData).sort();
+            if (names.length === 0) {
+                container.innerHTML = `<div class="text-center py-16 text-gray-400">
+                    <i class="fas fa-server text-5xl mb-4 opacity-40"></i>
+                    <p class="text-lg">No servers added yet.</p>
+                    ${CAN_MANAGE ? '<p class="text-sm mt-2">Click "Add Server" to get started.</p>' : ''}
+                </div>`;
+                return;
+            }
+            container.innerHTML = names.map(name => renderServerCard(name, serversData[name])).join('');
+        }
+
+        function renderServerCard(name, srv) {
+            const classNames = Object.keys(srv.classes).sort();
+            const totalIPs = classNames.reduce((s, c) => s + srv.classes[c].ip_count, 0);
+            const lastEvents = (srv.events || []).slice(0, 3);
+            const manageButtons = CAN_MANAGE ? `
+                <div class="flex items-center space-x-2">
+                    <button onclick="showAddClassModal('${esc(name)}')" class="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50 transition-all" title="Add Class">
+                        <i class="fas fa-plus-circle"></i>
+                    </button>
+                    <button onclick="showDeclareEventModal('${esc(name)}')" class="text-amber-500 hover:text-amber-700 p-1.5 rounded-lg hover:bg-amber-50 transition-all" title="Declare Event">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button onclick="showRenameServerModal('${esc(name)}')" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Rename">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteServer('${esc(name)}')" class="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-all" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>` : `
+                <button onclick="showDeclareEventModal('${esc(name)}')" class="text-amber-500 hover:text-amber-700 p-1.5 rounded-lg hover:bg-amber-50 transition-all" title="View Events">
+                    <i class="fas fa-bell"></i>
+                </button>`;
+
+            const classesHtml = classNames.length === 0 
+                ? '<p class="text-gray-400 text-sm italic py-2">No classes added yet.</p>'
+                : classNames.map(cn => renderClassBlock(name, cn, srv.classes[cn])).join('');
+
+            const eventsHtml = lastEvents.length > 0 ? `
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                    <p class="text-xs font-semibold text-gray-500 uppercase mb-2"><i class="fas fa-history mr-1"></i>Recent Events</p>
+                    ${lastEvents.map(e => {
+                        const cls = e.event_type === 'Available' ? 'event-available' : e.event_type === 'Down' ? 'event-down' : 'event-custom';
+                        const time = new Date(e.timestamp).toLocaleString();
+                        const scopeLabel = e.scope === 'server' ? 'Entire Server' : e.scope === 'class' ? `Class: ${e.class_name}` : `IPs: ${(e.ips||[]).join(', ')}`;
+                        return `<div class="flex items-center justify-between text-xs py-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="${cls} px-2 py-0.5 rounded-full border text-[10px] font-semibold">${e.event_type}</span>
+                                <span class="text-gray-500">${scopeLabel}</span>
+                            </div>
+                            <span class="text-gray-400">${time}</span>
+                        </div>`;
+                    }).join('')}
+                </div>` : '';
+
+            return `<div class="server-card card-glass rounded-2xl shadow-lg p-6 mb-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-server text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">${name}</h3>
+                            <p class="text-xs text-gray-500">${classNames.length} class(es) &middot; ${totalIPs} IP(s)</p>
+                        </div>
+                    </div>
+                    ${manageButtons}
+                </div>
+                <div class="space-y-3">${classesHtml}</div>
+                ${eventsHtml}
+            </div>`;
+        }
+
+        function renderClassBlock(serverName, className, cls) {
+            const ipsHtml = cls.ips.length === 0 
+                ? '<span class="text-gray-400 text-xs italic">No IPs added</span>'
+                : cls.ips.slice(0, 50).map(ip => `
+                    <span class="ip-tag inline-flex items-center bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-full border border-gray-200 mr-1 mb-1">
+                        ${ip}
+                        ${CAN_MANAGE ? `<button onclick="deleteIP('${esc(serverName)}','${esc(className)}','${ip}')" class="ml-1.5 text-red-400 hover:text-red-600"><i class="fas fa-times text-[9px]"></i></button>` : ''}
+                    </span>`).join('') + (cls.ips.length > 50 ? `<span class="text-xs text-gray-400 ml-1">+${cls.ips.length - 50} more</span>` : '');
+
+            const manageClassBtns = CAN_MANAGE ? `
+                <div class="flex items-center space-x-1.5 ml-auto">
+                    <button onclick="showAddIPsModal('${esc(serverName)}','${esc(className)}','${esc(cls.cidr)}')" class="text-green-500 hover:text-green-700 p-1 rounded hover:bg-green-50 text-xs" title="Add IPs">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button onclick="showEditClassModal('${esc(serverName)}','${esc(className)}','${esc(cls.cidr)}')" class="text-blue-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 text-xs" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteClass('${esc(serverName)}','${esc(className)}')" class="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 text-xs" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>` : '';
+
+            return `<div class="class-badge bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-lg">${className}</span>
+                    <span class="bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded font-mono">${cls.cidr}</span>
+                    <span class="text-xs text-gray-400">${cls.ip_count} IP(s)</span>
+                    ${manageClassBtns}
+                </div>
+                <div class="flex flex-wrap items-center mt-2">${ipsHtml}</div>
+            </div>`;
+        }
+
+        function esc(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+        function showAddServerModal() {
+            showModal(`
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-server text-blue-500 mr-2"></i>Add New Server</h3>
+                    <input id="new-server-name" type="text" placeholder="Server name (e.g. serv001)" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <div class="flex justify-end gap-3">
+                        <button onclick="closeAllModals()" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+                        <button onclick="addServer()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors">Add Server</button>
+                    </div>
+                </div>`);
+            setTimeout(() => document.getElementById('new-server-name').focus(), 100);
+        }
+
+        async function addServer() {
+            const name = document.getElementById('new-server-name').value.trim();
+            if (!name) { showToast('Server name is required.', 'error'); return; }
+            const res = await fetch('/api/ip-checker/server/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); closeAllModals(); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        async function deleteServer(name) {
+            if (!confirm(`Delete server "${name}" and all its data? This cannot be undone.`)) return;
+            const res = await fetch('/api/ip-checker/server/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        function showRenameServerModal(oldName) {
+            showModal(`
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-edit text-blue-500 mr-2"></i>Rename Server</h3>
+                    <p class="text-sm text-gray-500 mb-3">Current name: <strong>${oldName}</strong></p>
+                    <input id="rename-server-input" type="text" value="${oldName}" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <div class="flex justify-end gap-3">
+                        <button onclick="closeAllModals()" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+                        <button onclick="renameServer('${esc(oldName)}')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors">Rename</button>
+                    </div>
+                </div>`);
+            setTimeout(() => { const inp = document.getElementById('rename-server-input'); inp.focus(); inp.select(); }, 100);
+        }
+
+        async function renameServer(oldName) {
+            const newName = document.getElementById('rename-server-input').value.trim();
+            if (!newName) { showToast('Name is required.', 'error'); return; }
+            const res = await fetch('/api/ip-checker/server/rename', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({old_name:oldName, new_name:newName}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); closeAllModals(); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        function showAddClassModal(serverName) {
+            showModal(`
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-1"><i class="fas fa-sitemap text-blue-500 mr-2"></i>Add Class to ${serverName}</h3>
+                    <p class="text-xs text-gray-500 mb-4">Define a CIDR range for this class</p>
+                    <input id="new-class-name" type="text" placeholder="Class name (e.g. class-A)" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <input id="new-class-cidr" type="text" placeholder="CIDR (e.g. 154.23.60.0/24)" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono">
+                    <div class="flex justify-end gap-3">
+                        <button onclick="closeAllModals()" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+                        <button onclick="addClass('${esc(serverName)}')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors">Add Class</button>
+                    </div>
+                </div>`);
+            setTimeout(() => document.getElementById('new-class-name').focus(), 100);
+        }
+
+        async function addClass(serverName) {
+            const cn = document.getElementById('new-class-name').value.trim();
+            const cidr = document.getElementById('new-class-cidr').value.trim();
+            if (!cn || !cidr) { showToast('Both fields are required.', 'error'); return; }
+            const res = await fetch('/api/ip-checker/class/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({server:serverName, class_name:cn, cidr}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); closeAllModals(); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        function showEditClassModal(serverName, className, cidr) {
+            showModal(`
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-edit text-blue-500 mr-2"></i>Edit Class</h3>
+                    <p class="text-xs text-gray-500 mb-3">Server: <strong>${serverName}</strong></p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Class Name</label>
+                    <input id="edit-class-name" type="text" value="${className}" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">CIDR Range</label>
+                    <input id="edit-class-cidr" type="text" value="${cidr}" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono">
+                    <p class="text-xs text-amber-600 mb-4"><i class="fas fa-exclamation-triangle mr-1"></i>IPs outside the new range will be removed automatically.</p>
+                    <div class="flex justify-end gap-3">
+                        <button onclick="closeAllModals()" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+                        <button onclick="editClass('${esc(serverName)}','${esc(className)}')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors">Save</button>
+                    </div>
+                </div>`);
+        }
+
+        async function editClass(serverName, oldClassName) {
+            const newName = document.getElementById('edit-class-name').value.trim();
+            const newCidr = document.getElementById('edit-class-cidr').value.trim();
+            if (!newName || !newCidr) { showToast('Both fields are required.', 'error'); return; }
+            const res = await fetch('/api/ip-checker/class/edit', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({server:serverName, old_class_name:oldClassName, new_class_name:newName, new_cidr:newCidr}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); closeAllModals(); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        async function deleteClass(serverName, className) {
+            if (!confirm(`Delete class "${className}" from "${serverName}"?`)) return;
+            const res = await fetch('/api/ip-checker/class/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({server:serverName, class_name:className}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        function showAddIPsModal(serverName, className, cidr) {
+            showModal(`
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-1"><i class="fas fa-plus-circle text-green-500 mr-2"></i>Add IPs</h3>
+                    <p class="text-xs text-gray-500 mb-4">Server: <strong>${serverName}</strong> &middot; Class: <strong>${className}</strong> <span class="font-mono">(${cidr})</span></p>
+                    <textarea id="add-ips-textarea" rows="8" placeholder="Enter IP addresses, one per line&#10;e.g.&#10;154.23.60.1&#10;154.23.60.2&#10;154.23.60.3"
+                        class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono text-sm resize-none"></textarea>
+                    <p class="text-xs text-gray-500 mb-4"><i class="fas fa-info-circle mr-1"></i>IPs must belong to the CIDR range <span class="font-mono font-semibold">${cidr}</span></p>
+                    <div id="add-ips-results" class="hidden mb-4"></div>
+                    <div class="flex justify-end gap-3">
+                        <button onclick="closeAllModals()" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+                        <button id="add-ips-btn" onclick="addIPs('${esc(serverName)}','${esc(className)}')" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors">Add IPs</button>
+                    </div>
+                </div>`);
+            setTimeout(() => document.getElementById('add-ips-textarea').focus(), 100);
+        }
+
+        async function addIPs(serverName, className) {
+            const ips = document.getElementById('add-ips-textarea').value.trim();
+            if (!ips) { showToast('Please enter IP addresses.', 'error'); return; }
+            const btn = document.getElementById('add-ips-btn');
+            btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+            const res = await fetch('/api/ip-checker/ips/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({server:serverName, class_name:className, ips}) });
+            const data = await res.json();
+            btn.disabled = false; btn.innerHTML = 'Add IPs';
+            if (data.success) {
+                showToast(data.message, 'success');
+                const r = data.results || {};
+                let html = `<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-sm"><i class="fas fa-check-circle text-green-500 mr-1"></i> ${r.added || 0} IPs added successfully.</div>`;
+                if ((r.invalid||[]).length) html += `<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm mt-2"><i class="fas fa-times-circle text-red-500 mr-1"></i> Invalid: ${r.invalid.join(', ')}</div>`;
+                if ((r.duplicate||[]).length) html += `<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm mt-2"><i class="fas fa-clone text-yellow-500 mr-1"></i> Duplicate: ${r.duplicate.join(', ')}</div>`;
+                if ((r.out_of_range||[]).length) html += `<div class="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm mt-2"><i class="fas fa-exclamation-triangle text-orange-500 mr-1"></i> Out of range: ${r.out_of_range.join(', ')}</div>`;
+                const rDiv = document.getElementById('add-ips-results');
+                rDiv.innerHTML = html; rDiv.classList.remove('hidden');
+                loadServers();
+            } else showToast(data.message || data.error, 'error');
+        }
+
+        async function deleteIP(serverName, className, ip) {
+            if (!confirm(`Remove IP ${ip}?`)) return;
+            const res = await fetch('/api/ip-checker/ip/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({server:serverName, class_name:className, ip}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        async function showDeclareEventModal(serverName) {
+            if (eventTypesCache.length === 0) {
+                const res = await fetch('/api/ip-checker/event-types');
+                const data = await res.json();
+                eventTypesCache = data.event_types || [];
+            }
+            const srv = serversData[serverName] || {};
+            const classes = Object.keys(srv.classes || {}).sort();
+            const allIps = [];
+            classes.forEach(c => (srv.classes[c].ips || []).forEach(ip => allIps.push({ip, cls: c})));
+
+            const eventOpts = eventTypesCache.map(t => `<option value="${t}">${t}</option>`).join('');
+            const classOpts = classes.map(c => `<option value="${c}">${c} (${srv.classes[c].cidr})</option>`).join('');
+
+            showModal(`
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-bell text-amber-500 mr-2"></i>Declare Event on ${serverName}</h3>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                    <select id="event-type-select" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500">${eventOpts}</select>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Scope</label>
+                    <select id="event-scope-select" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500" onchange="toggleEventScope()">
+                        <option value="server">Entire Server</option>
+                        <option value="class">Specific Class</option>
+                        <option value="ip">Specific IPs</option>
+                    </select>
+                    <div id="event-class-section" class="hidden mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                        <select id="event-class-select" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500">${classOpts}</select>
+                    </div>
+                    <div id="event-ips-section" class="hidden mb-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">IPs (one per line)</label>
+                        <textarea id="event-ips-textarea" rows="4" placeholder="Enter IPs..." class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-mono text-sm resize-none"></textarea>
+                    </div>
+                    <div class="flex justify-end gap-3 mt-4">
+                        <button onclick="closeAllModals()" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+                        <button onclick="declareEvent('${esc(serverName)}')" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors">Declare Event</button>
+                    </div>
+                </div>`);
+        }
+
+        function toggleEventScope() {
+            const scope = document.getElementById('event-scope-select').value;
+            document.getElementById('event-class-section').classList.toggle('hidden', scope !== 'class');
+            document.getElementById('event-ips-section').classList.toggle('hidden', scope !== 'ip');
+        }
+
+        async function declareEvent(serverName) {
+            const eventType = document.getElementById('event-type-select').value;
+            const scope = document.getElementById('event-scope-select').value;
+            let className = null, ips = [];
+            if (scope === 'class') className = document.getElementById('event-class-select').value;
+            if (scope === 'ip') {
+                const text = document.getElementById('event-ips-textarea').value.trim();
+                ips = text.split('\n').map(s => s.trim()).filter(Boolean);
+                if (ips.length === 0) { showToast('Enter at least one IP.', 'error'); return; }
+            }
+            const res = await fetch('/api/ip-checker/event/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({server:serverName, event_type:eventType, scope, class_name:className, ips}) });
+            const data = await res.json();
+            if (data.success) { showToast('Event declared!', 'success'); closeAllModals(); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        async function searchIP() {
+            const ip = document.getElementById('search-ip-input').value.trim();
+            if (!ip) { showToast('Enter an IP address to search.', 'error'); return; }
+            const container = document.getElementById('search-results');
+            container.classList.remove('hidden');
+            container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin text-blue-500 text-xl"></i></div>';
+            const res = await fetch('/api/ip-checker/search', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip}) });
+            const data = await res.json();
+            if (!data.success) {
+                container.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700"><i class="fas fa-exclamation-circle mr-2"></i>${data.message}</div>`;
+                return;
+            }
+            if (data.results.length === 0) {
+                container.innerHTML = `<div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-700"><i class="fas fa-search mr-2"></i>No matches found for <strong class="font-mono">${ip}</strong>.</div>`;
+                return;
+            }
+            container.innerHTML = `
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-2 mb-2"><span class="text-sm text-blue-700"><i class="fas fa-check-circle mr-1"></i>Found <strong>${data.results.length}</strong> match(es) for <strong class="font-mono">${ip}</strong></span></div>
+                ${data.results.map(r => {
+                    const inRange = r.in_range_but_not_added;
+                    return `<div class="search-result bg-white border ${inRange ? 'border-yellow-200' : 'border-green-200'} rounded-xl p-4 mb-2">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm font-semibold"><i class="fas fa-server mr-1"></i>${r.server}</span>
+                            <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-lg text-sm font-semibold">${r.class_name}</span>
+                            <span class="font-mono text-xs text-gray-500">${r.cidr}</span>
+                            ${inRange ? '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs">In range but not added</span>' : '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">Registered</span>'}
+                        </div>
+                        ${!inRange && r.events.length > 0 ? `
+                            <div class="mt-3 pt-3 border-t border-gray-100">
+                                <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Event History</p>
+                                ${r.events.map(e => {
+                                    const cls = e.event_type === 'Available' ? 'event-available' : e.event_type === 'Down' ? 'event-down' : 'event-custom';
+                                    return `<div class="flex items-center justify-between text-xs py-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="${cls} px-2 py-0.5 rounded-full border font-semibold">${e.event_type}</span>
+                                            <span class="text-gray-500">${e.scope === 'server' ? 'Server-wide' : e.scope === 'class' ? 'Class: '+e.class_name : 'IP-specific'}</span>
+                                            <span class="text-gray-400">by ${e.declared_by}</span>
+                                        </div>
+                                        <span class="text-gray-400">${new Date(e.timestamp).toLocaleString()}</span>
+                                    </div>`;
+                                }).join('')}
+                            </div>` : ''}
+                    </div>`;
+                }).join('')}`;
+        }
+
+        async function loadEvents() {
+            const server = document.getElementById('event-filter-server').value;
+            const container = document.getElementById('events-list');
+            container.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-blue-500"></i></div>';
+            const url = '/api/ip-checker/events' + (server ? `?server=${encodeURIComponent(server)}` : '');
+            const res = await fetch(url);
+            const data = await res.json();
+            const events = data.events || [];
+            if (events.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-calendar-times text-4xl mb-3 opacity-40"></i><p>No events recorded yet.</p></div>';
+                return;
+            }
+            container.innerHTML = `<div class="space-y-2">${events.map(e => {
+                const cls = e.event_type === 'Available' ? 'event-available' : e.event_type === 'Down' ? 'event-down' : 'event-custom';
+                const scopeLabel = e.scope === 'server' ? 'Entire Server' : e.scope === 'class' ? `Class: ${e.class_name}` : `IPs: ${(e.ips||[]).slice(0,5).join(', ')}${(e.ips||[]).length>5?'...':''}`;
+                const time = new Date(e.timestamp).toLocaleString();
+                return `<div class="flex items-center justify-between bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <span class="${cls} px-3 py-1 rounded-full border text-xs font-bold">${e.event_type}</span>
+                        <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg text-xs font-semibold"><i class="fas fa-server mr-1"></i>${e.server}</span>
+                        <span class="text-xs text-gray-600">${scopeLabel}</span>
+                        <span class="text-xs text-gray-400">by ${e.declared_by}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-gray-400 whitespace-nowrap">${time}</span>
+                        ${CAN_MANAGE ? `<button onclick="deleteEvent('${e.id}')" class="text-red-400 hover:text-red-600 p-1" title="Delete"><i class="fas fa-trash text-xs"></i></button>` : ''}
+                    </div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        async function deleteEvent(eventId) {
+            if (!confirm('Delete this event?')) return;
+            const res = await fetch('/api/ip-checker/event/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({event_id:eventId}) });
+            const data = await res.json();
+            if (data.success) { showToast('Event deleted.', 'success'); loadEvents(); loadServers(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        async function loadEventTypes() {
+            const res = await fetch('/api/ip-checker/event-types');
+            const data = await res.json();
+            eventTypesCache = data.event_types || [];
+            const container = document.getElementById('event-types-list');
+            if (!container) return;
+            container.innerHTML = eventTypesCache.map(t => {
+                const isDefault = (t === 'Available' || t === 'Down');
+                const color = t === 'Available' ? 'green' : t === 'Down' ? 'red' : 'blue';
+                return `<div class="flex items-center justify-between bg-${color}-50 border border-${color}-200 rounded-xl p-3">
+                    <span class="font-semibold text-${color}-700 text-sm"><i class="fas fa-tag mr-2"></i>${t}</span>
+                    ${!isDefault ? `<button onclick="deleteEventType('${esc(t)}')" class="text-red-400 hover:text-red-600 p-1" title="Delete"><i class="fas fa-trash text-xs"></i></button>` : '<span class="text-xs text-gray-400">Default</span>'}
+                </div>`;
+            }).join('');
+        }
+
+        function showAddEventTypeModal() {
+            showModal(`
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-tag text-purple-500 mr-2"></i>Add Event Type</h3>
+                    <input id="new-event-type-name" type="text" placeholder="Event type name (e.g. Maintenance)" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mb-4 focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                    <div class="flex justify-end gap-3">
+                        <button onclick="closeAllModals()" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium">Cancel</button>
+                        <button onclick="addEventType()" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-colors">Add Type</button>
+                    </div>
+                </div>`);
+            setTimeout(() => document.getElementById('new-event-type-name').focus(), 100);
+        }
+
+        async function addEventType() {
+            const name = document.getElementById('new-event-type-name').value.trim();
+            if (!name) { showToast('Event type name is required.', 'error'); return; }
+            const res = await fetch('/api/ip-checker/event-types/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); closeAllModals(); loadEventTypes(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        async function deleteEventType(name) {
+            if (!confirm(`Delete event type "${name}"?`)) return;
+            const res = await fetch('/api/ip-checker/event-types/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name}) });
+            const data = await res.json();
+            if (data.success) { showToast(data.message, 'success'); loadEventTypes(); }
+            else showToast(data.message || data.error, 'error');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { loadServers(); });
+    </script>
+</body>
+</html>
