@@ -3497,22 +3497,22 @@ def ip_checker_servers():
     if not current_user.has_ips_cheker_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     data = ip_checker.load_servers()
-    events = ip_checker.load_events()
     servers = {}
     for sname, sdata in data.items():
         classes = {}
-        for cname, cdata in sdata['classes'].items():
-            classes[cname] = {
-                'cidr': cdata['cidr'],
+        for cidr, cdata in sdata['classes'].items():
+            class_status = ip_checker.get_latest_status(sname, cidr)
+            classes[cidr] = {
                 'ips': cdata['ips'],
                 'ip_count': len(cdata['ips']),
-                'created_at': cdata.get('created_at', '')
+                'created_at': cdata.get('created_at', ''),
+                'status': class_status
             }
-        server_events = [e for e in events if e.get('server') == sname]
+        server_status = ip_checker.get_latest_status(sname)
         servers[sname] = {
             'classes': classes,
             'created_at': sdata.get('created_at', ''),
-            'events': server_events[:20]
+            'status': server_status
         }
     return jsonify({'servers': servers})
 
@@ -3524,10 +3524,13 @@ def ip_checker_add_server():
         return jsonify({'error': 'Unauthorized'}), 403
     data = request.get_json()
     name = data.get('name', '').strip()
-    if not name:
-        return jsonify({'error': 'Server name is required.'}), 400
-    ok, msg = ip_checker.add_server(name)
-    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
+    cidr = data.get('cidr', '').strip()
+    ips_text = data.get('ips', '').strip()
+    if not name or not cidr:
+        return jsonify({'error': 'Server name and class (CIDR) are required.'}), 400
+    ip_list = [ip.strip() for ip in ips_text.split('\n') if ip.strip()] if ips_text else []
+    ok, msg, results = ip_checker.add_server_with_class(name, cidr, ip_list)
+    return jsonify({'success': ok, 'message': msg, 'results': results}), 200 if ok else 400
 
 
 @app.route('/api/ip-checker/server/delete', methods=['POST'])
@@ -3564,27 +3567,10 @@ def ip_checker_add_class():
         return jsonify({'error': 'Unauthorized'}), 403
     data = request.get_json()
     server = data.get('server', '').strip()
-    class_name = data.get('class_name', '').strip()
     cidr = data.get('cidr', '').strip()
-    if not server or not class_name or not cidr:
-        return jsonify({'error': 'Server, class name, and CIDR are required.'}), 400
-    ok, msg = ip_checker.add_class_to_server(server, class_name, cidr)
-    return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
-
-
-@app.route('/api/ip-checker/class/edit', methods=['POST'])
-@login_required
-def ip_checker_edit_class():
-    if not current_user.has_add_ip_cheker_permission:
-        return jsonify({'error': 'Unauthorized'}), 403
-    data = request.get_json()
-    server = data.get('server', '').strip()
-    old_name = data.get('old_class_name', '').strip()
-    new_name = data.get('new_class_name', '').strip()
-    new_cidr = data.get('new_cidr', '').strip()
-    if not server or not old_name or not new_name or not new_cidr:
-        return jsonify({'error': 'All fields are required.'}), 400
-    ok, msg = ip_checker.edit_class(server, old_name, new_name, new_cidr)
+    if not server or not cidr:
+        return jsonify({'error': 'Server and CIDR are required.'}), 400
+    ok, msg = ip_checker.add_class_to_server(server, cidr)
     return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
 
 
@@ -3595,10 +3581,10 @@ def ip_checker_delete_class():
         return jsonify({'error': 'Unauthorized'}), 403
     data = request.get_json()
     server = data.get('server', '').strip()
-    class_name = data.get('class_name', '').strip()
-    if not server or not class_name:
-        return jsonify({'error': 'Server and class name are required.'}), 400
-    ok, msg = ip_checker.delete_class_from_server(server, class_name)
+    cidr = data.get('cidr', '').strip()
+    if not server or not cidr:
+        return jsonify({'error': 'Server and CIDR are required.'}), 400
+    ok, msg = ip_checker.delete_class_from_server(server, cidr)
     return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
 
 
@@ -3609,14 +3595,14 @@ def ip_checker_add_ips():
         return jsonify({'error': 'Unauthorized'}), 403
     data = request.get_json()
     server = data.get('server', '').strip()
-    class_name = data.get('class_name', '').strip()
+    cidr = data.get('cidr', '').strip()
     ips_text = data.get('ips', '').strip()
-    if not server or not class_name or not ips_text:
+    if not server or not cidr or not ips_text:
         return jsonify({'error': 'Server, class, and IPs are required.'}), 400
     ip_list = [ip.strip() for ip in ips_text.split('\n') if ip.strip()]
     if not ip_list:
         return jsonify({'error': 'No valid IPs provided.'}), 400
-    ok, msg, results = ip_checker.add_ips_to_class(server, class_name, ip_list)
+    ok, msg, results = ip_checker.add_ips_to_class(server, cidr, ip_list)
     return jsonify({'success': ok, 'message': msg, 'results': results})
 
 
@@ -3627,11 +3613,11 @@ def ip_checker_delete_ip():
         return jsonify({'error': 'Unauthorized'}), 403
     data = request.get_json()
     server = data.get('server', '').strip()
-    class_name = data.get('class_name', '').strip()
+    cidr = data.get('cidr', '').strip()
     ip_str = data.get('ip', '').strip()
-    if not server or not class_name or not ip_str:
+    if not server or not cidr or not ip_str:
         return jsonify({'error': 'Server, class, and IP are required.'}), 400
-    ok, msg = ip_checker.delete_ip_from_class(server, class_name, ip_str)
+    ok, msg = ip_checker.delete_ip_from_class(server, cidr, ip_str)
     return jsonify({'success': ok, 'message': msg}), 200 if ok else 400
 
 
@@ -3657,17 +3643,17 @@ def ip_checker_add_event():
     server = data.get('server', '').strip()
     event_type = data.get('event_type', '').strip()
     scope = data.get('scope', '').strip()
-    class_name = data.get('class_name', '').strip() or None
+    cidr = data.get('cidr', '').strip() or None
     ips = data.get('ips', [])
     if not server or not event_type or not scope:
         return jsonify({'error': 'Server, event type, and scope are required.'}), 400
     if scope not in ('server', 'class', 'ip'):
         return jsonify({'error': 'Invalid scope.'}), 400
-    if scope == 'class' and not class_name:
-        return jsonify({'error': 'Class name is required for class scope.'}), 400
+    if scope == 'class' and not cidr:
+        return jsonify({'error': 'Class (CIDR) is required for class scope.'}), 400
     if scope == 'ip' and not ips:
         return jsonify({'error': 'At least one IP is required for IP scope.'}), 400
-    ok, msg, event = ip_checker.add_event(server, event_type, scope, class_name, ips, current_user.name)
+    ok, msg, event = ip_checker.add_event(server, event_type, scope, cidr, ips, current_user.name)
     return jsonify({'success': ok, 'message': msg, 'event': event})
 
 

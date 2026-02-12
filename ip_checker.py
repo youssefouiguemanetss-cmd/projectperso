@@ -13,7 +13,6 @@ _lock = threading.Lock()
 
 DEFAULT_EVENT_TYPES = ['Available', 'Down']
 
-
 _SENTINEL = object()
 
 def _load_json(filepath, default=_SENTINEL):
@@ -92,16 +91,66 @@ def validate_ip_format(ip_str):
         return False
 
 
-def add_server(server_name):
+def add_server_with_class(server_name, cidr, ip_list=None):
+    valid, result = validate_cidr(cidr)
+    if not valid:
+        return False, f"Invalid CIDR: {result}", {}
+
     data = load_servers()
-    if server_name in data:
-        return False, f"Server '{server_name}' already exists."
-    data[server_name] = {
-        'classes': {},
+    is_new_server = server_name not in data
+
+    if is_new_server:
+        data[server_name] = {
+            'classes': {},
+            'created_at': datetime.now().isoformat()
+        }
+
+    if cidr in data[server_name]['classes']:
+        return False, f"Class '{cidr}' already exists in server '{server_name}'.", {}
+
+    data[server_name]['classes'][cidr] = {
+        'ips': [],
         'created_at': datetime.now().isoformat()
     }
+
+    results = {'added': 0, 'invalid': [], 'duplicate': [], 'out_of_range': []}
+    if ip_list:
+        existing = set()
+        added = []
+        for ip_str in ip_list:
+            ip_str = ip_str.strip()
+            if not ip_str:
+                continue
+            if not validate_ip_format(ip_str):
+                results['invalid'].append(ip_str)
+                continue
+            if ip_str in existing:
+                results['duplicate'].append(ip_str)
+                continue
+            if not validate_ip_in_cidr(ip_str, cidr):
+                results['out_of_range'].append(ip_str)
+                continue
+            existing.add(ip_str)
+            added.append(ip_str)
+        data[server_name]['classes'][cidr]['ips'] = added
+        results['added'] = len(added)
+
     save_servers(data)
-    return True, f"Server '{server_name}' added successfully."
+    action = "created" if is_new_server else "updated"
+    msg = f"Server '{server_name}' {action} with class '{cidr}'."
+    if results['added'] > 0:
+        msg += f" {results['added']} IPs added."
+    issues = len(results['invalid']) + len(results['duplicate']) + len(results['out_of_range'])
+    if issues > 0:
+        parts = []
+        if results['invalid']:
+            parts.append(f"{len(results['invalid'])} invalid")
+        if results['duplicate']:
+            parts.append(f"{len(results['duplicate'])} duplicate")
+        if results['out_of_range']:
+            parts.append(f"{len(results['out_of_range'])} out of range")
+        msg += f" Skipped: {', '.join(parts)}."
+    return True, msg, results
 
 
 def delete_server(server_name):
@@ -113,7 +162,7 @@ def delete_server(server_name):
     events = load_events()
     events = [e for e in events if e.get('server') != server_name]
     save_events(events)
-    return True, f"Server '{server_name}' deleted successfully."
+    return True, f"Server '{server_name}' deleted."
 
 
 def rename_server(old_name, new_name):
@@ -132,88 +181,52 @@ def rename_server(old_name, new_name):
     return True, f"Server renamed to '{new_name}'."
 
 
-def add_class_to_server(server_name, class_name, cidr):
+def add_class_to_server(server_name, cidr):
     valid, result = validate_cidr(cidr)
     if not valid:
         return False, f"Invalid CIDR: {result}"
     data = load_servers()
     if server_name not in data:
         return False, f"Server '{server_name}' not found."
-    if class_name in data[server_name]['classes']:
-        return False, f"Class '{class_name}' already exists in server '{server_name}'."
-    data[server_name]['classes'][class_name] = {
-        'cidr': cidr,
+    if cidr in data[server_name]['classes']:
+        return False, f"Class '{cidr}' already exists in server '{server_name}'."
+    data[server_name]['classes'][cidr] = {
         'ips': [],
         'created_at': datetime.now().isoformat()
     }
     save_servers(data)
-    return True, f"Class '{class_name}' ({cidr}) added to server '{server_name}'."
+    return True, f"Class '{cidr}' added to server '{server_name}'."
 
 
-def delete_class_from_server(server_name, class_name):
+def delete_class_from_server(server_name, cidr):
     data = load_servers()
     if server_name not in data:
         return False, f"Server '{server_name}' not found."
-    if class_name not in data[server_name]['classes']:
-        return False, f"Class '{class_name}' not found in server '{server_name}'."
-    del data[server_name]['classes'][class_name]
+    if cidr not in data[server_name]['classes']:
+        return False, f"Class '{cidr}' not found in server '{server_name}'."
+    del data[server_name]['classes'][cidr]
     save_servers(data)
     events = load_events()
-    events = [e for e in events if not (e.get('server') == server_name and e.get('class_name') == class_name and e.get('scope') == 'class')]
+    events = [e for e in events if not (e.get('server') == server_name and e.get('cidr') == cidr and e.get('scope') == 'class')]
     save_events(events)
-    return True, f"Class '{class_name}' deleted from server '{server_name}'."
+    return True, f"Class '{cidr}' deleted from server '{server_name}'."
 
 
-def edit_class(server_name, old_class_name, new_class_name, new_cidr):
-    data = load_servers()
-    if server_name not in data:
-        return False, f"Server '{server_name}' not found."
-    if old_class_name not in data[server_name]['classes']:
-        return False, f"Class '{old_class_name}' not found."
-    if new_class_name != old_class_name and new_class_name in data[server_name]['classes']:
-        return False, f"Class '{new_class_name}' already exists."
-    valid, result = validate_cidr(new_cidr)
-    if not valid:
-        return False, f"Invalid CIDR: {result}"
-    old_data = data[server_name]['classes'].pop(old_class_name)
-    old_cidr = old_data['cidr']
-    valid_ips = []
-    for ip in old_data['ips']:
-        if validate_ip_in_cidr(ip, new_cidr):
-            valid_ips.append(ip)
-    old_data['cidr'] = new_cidr
-    old_data['ips'] = valid_ips
-    data[server_name]['classes'][new_class_name] = old_data
-    save_servers(data)
-    if old_class_name != new_class_name:
-        events = load_events()
-        for e in events:
-            if e.get('server') == server_name and e.get('class_name') == old_class_name:
-                e['class_name'] = new_class_name
-        save_events(events)
-    removed = len(old_data['ips']) - len(valid_ips) if old_cidr != new_cidr else 0
-    msg = f"Class updated to '{new_class_name}' ({new_cidr})."
-    if removed > 0:
-        msg += f" {removed} IPs removed (out of new CIDR range)."
-    return True, msg
-
-
-def add_ips_to_class(server_name, class_name, ip_list):
+def add_ips_to_class(server_name, cidr, ip_list):
     data = load_servers()
     if server_name not in data:
         return False, f"Server '{server_name}' not found.", {}
-    if class_name not in data[server_name]['classes']:
-        return False, f"Class '{class_name}' not found.", {}
-    
-    cls = data[server_name]['classes'][class_name]
-    cidr = cls['cidr']
+    if cidr not in data[server_name]['classes']:
+        return False, f"Class '{cidr}' not found.", {}
+
+    cls = data[server_name]['classes'][cidr]
     existing = set(cls['ips'])
-    
+
     added = []
     invalid = []
     duplicate = []
     out_of_range = []
-    
+
     for ip_str in ip_list:
         ip_str = ip_str.strip()
         if not ip_str:
@@ -229,20 +242,20 @@ def add_ips_to_class(server_name, class_name, ip_list):
             continue
         existing.add(ip_str)
         added.append(ip_str)
-    
+
     cls['ips'] = list(existing)
     save_servers(data)
-    
+
     results = {
         'added': len(added),
         'invalid': invalid,
         'duplicate': duplicate,
         'out_of_range': out_of_range
     }
-    
-    total_issues = len(invalid) + len(duplicate) + len(out_of_range)
+
     msg = f"{len(added)} IPs added."
-    if total_issues > 0:
+    issues = len(invalid) + len(duplicate) + len(out_of_range)
+    if issues > 0:
         parts = []
         if invalid:
             parts.append(f"{len(invalid)} invalid")
@@ -251,19 +264,19 @@ def add_ips_to_class(server_name, class_name, ip_list):
         if out_of_range:
             parts.append(f"{len(out_of_range)} out of range")
         msg += f" Skipped: {', '.join(parts)}."
-    
+
     return True, msg, results
 
 
-def delete_ip_from_class(server_name, class_name, ip_str):
+def delete_ip_from_class(server_name, cidr, ip_str):
     data = load_servers()
     if server_name not in data:
         return False, f"Server '{server_name}' not found."
-    if class_name not in data[server_name]['classes']:
-        return False, f"Class '{class_name}' not found."
-    cls = data[server_name]['classes'][class_name]
+    if cidr not in data[server_name]['classes']:
+        return False, f"Class '{cidr}' not found."
+    cls = data[server_name]['classes'][cidr]
     if ip_str not in cls['ips']:
-        return False, f"IP '{ip_str}' not found in class '{class_name}'."
+        return False, f"IP '{ip_str}' not found in class '{cidr}'."
     cls['ips'].remove(ip_str)
     save_servers(data)
     events = load_events()
@@ -272,14 +285,14 @@ def delete_ip_from_class(server_name, class_name, ip_str):
     return True, f"IP '{ip_str}' deleted."
 
 
-def add_event(server_name, event_type, scope, class_name=None, ips=None, declared_by='system'):
+def add_event(server_name, event_type, scope, cidr=None, ips=None, declared_by='system'):
     events = load_events()
     event = {
         'id': f"evt_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
         'server': server_name,
         'event_type': event_type,
         'scope': scope,
-        'class_name': class_name,
+        'cidr': cidr,
         'ips': ips or [],
         'declared_by': declared_by,
         'timestamp': datetime.now().isoformat(),
@@ -316,55 +329,53 @@ def delete_event_type(event_name):
     return True, f"Event type '{event_name}' deleted."
 
 
+def get_latest_status(server_name, cidr=None, ip_str=None):
+    events = load_events()
+    for e in events:
+        if e.get('server') != server_name:
+            continue
+        if ip_str:
+            if e.get('scope') == 'ip' and ip_str in e.get('ips', []):
+                return e
+            if e.get('scope') == 'class' and e.get('cidr') == cidr:
+                return e
+            if e.get('scope') == 'server':
+                return e
+        elif cidr:
+            if e.get('scope') == 'class' and e.get('cidr') == cidr:
+                return e
+            if e.get('scope') == 'server':
+                return e
+        else:
+            if e.get('scope') == 'server':
+                return e
+    return None
+
+
 def search_ip(ip_str):
     if not validate_ip_format(ip_str):
         return False, f"'{ip_str}' is not a valid IP address.", []
-    
+
     data = load_servers()
     events = load_events()
     results = []
-    
+
     for server_name, server_data in data.items():
-        for class_name, cls in server_data['classes'].items():
+        for cidr, cls in server_data['classes'].items():
             if ip_str in cls['ips']:
-                ip_events = [e for e in events if
-                    e.get('server') == server_name and (
-                        e.get('scope') == 'server' or
-                        (e.get('scope') == 'class' and e.get('class_name') == class_name) or
-                        (e.get('scope') == 'ip' and ip_str in e.get('ips', []))
-                    )]
+                status = get_latest_status(server_name, cidr, ip_str)
                 results.append({
                     'server': server_name,
-                    'class_name': class_name,
-                    'cidr': cls['cidr'],
-                    'events': ip_events
+                    'cidr': cidr,
+                    'status': status,
+                    'registered': True
                 })
-            elif validate_ip_in_cidr(ip_str, cls['cidr']):
+            elif validate_ip_in_cidr(ip_str, cidr):
                 results.append({
                     'server': server_name,
-                    'class_name': class_name,
-                    'cidr': cls['cidr'],
-                    'in_range_but_not_added': True,
-                    'events': []
+                    'cidr': cidr,
+                    'status': None,
+                    'registered': False
                 })
-    
+
     return True, f"Found {len(results)} match(es).", results
-
-
-def get_server_events(server_name):
-    events = load_events()
-    return [e for e in events if e.get('server') == server_name]
-
-
-def get_all_data_summary():
-    data = load_servers()
-    summary = []
-    for server_name, server_data in data.items():
-        total_ips = sum(len(cls['ips']) for cls in server_data['classes'].values())
-        summary.append({
-            'name': server_name,
-            'classes_count': len(server_data['classes']),
-            'total_ips': total_ips,
-            'created_at': server_data.get('created_at', '')
-        })
-    return summary
