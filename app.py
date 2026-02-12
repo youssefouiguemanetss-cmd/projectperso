@@ -3643,7 +3643,7 @@ def ip_checker_add_event():
     server = data.get('server', '').strip()
     event_type = data.get('event_type', '').strip()
     scope = data.get('scope', '').strip()
-    cidr = data.get('cidr', '').strip() or None
+    cidr = (data.get('cidr') or '').strip() or None
     ips = data.get('ips', [])
     if not server or not event_type or not scope:
         return jsonify({'error': 'Server, event type, and scope are required.'}), 400
