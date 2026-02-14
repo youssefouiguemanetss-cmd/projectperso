@@ -354,46 +354,74 @@ def get_latest_status(server_name, cidr=None, ip_str=None):
 
 import random
 
-def generate_random_ips(server_name, selected_cidrs, from_idx, to_idx, filter_type='all'):
+def generate_random_ips(server_names, selected_cidrs, from_idx, to_idx, filter_type='all'):
     data = load_servers()
-    if server_name not in data:
-        return False, f"Server '{server_name}' not found.", ""
-
     all_matching_ips = []
-    server_data = data[server_name]
 
-    for cidr in selected_cidrs:
-        if cidr not in server_data['classes']:
+    for server_name in server_names:
+        if server_name not in data:
             continue
         
-        cls = server_data['classes'][cidr]
-        ips = cls['ips']
-        
-        if filter_type != 'all':
-            filtered = []
-            for ip in ips:
-                status = get_latest_status(server_name, cidr, ip)
-                status_type = status['event_type'] if status else 'Available'
-                if status_type == filter_type:
-                    filtered.append(ip)
-            ips = filtered
+        server_data = data[server_name]
+        for cidr in selected_cidrs:
+            if cidr not in server_data['classes']:
+                continue
             
-        all_matching_ips.extend(ips)
+            cls = server_data['classes'][cidr]
+            ips = cls['ips']
+            
+            if filter_type != 'all':
+                filtered = []
+                for ip in ips:
+                    status = get_latest_status(server_name, cidr, ip)
+                    status_type = status['event_type'] if status else 'Available'
+                    if status_type == filter_type:
+                        filtered.append(ip)
+                ips = filtered
+                
+            all_matching_ips.extend(ips)
 
     if not all_matching_ips:
         return False, "No IPs found matching the criteria.", ""
 
-    # Sort to ensure predictable order
-    all_matching_ips.sort()
+    # Sort and remove duplicates if they exist across classes/servers
+    all_matching_ips = sorted(list(set(all_matching_ips)))
     unique_count = len(all_matching_ips)
     
     total_requested = (to_idx - from_idx) + 1
     result_ips = []
     
     for i in range(total_requested):
-        # Cycle through IPs if requested more than unique count
         ip = all_matching_ips[i % unique_count]
         idx = from_idx + i
         result_ips.append(f"{idx}#{ip}:92")
 
     return True, "Success", "\n".join(result_ips)
+
+
+def search_ip(ip_str):
+    if not validate_ip_format(ip_str):
+        return False, f"'{ip_str}' is not a valid IP address.", []
+
+    data = load_servers()
+    results = []
+
+    for server_name, server_data in data.items():
+        for cidr, cls in server_data['classes'].items():
+            if ip_str in cls['ips']:
+                status = get_latest_status(server_name, cidr, ip_str)
+                results.append({
+                    'server': server_name,
+                    'cidr': cidr,
+                    'status': status,
+                    'registered': True
+                })
+            elif validate_ip_in_cidr(ip_str, cidr):
+                results.append({
+                    'server': server_name,
+                    'cidr': cidr,
+                    'status': None,
+                    'registered': False
+                })
+
+    return True, f"Found {len(results)} match(es).", results

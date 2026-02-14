@@ -242,8 +242,28 @@
                 <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-1">
                     ${cls.ips.map(ip => {
                         let ipStatusClass = '';
-                        if (cls.status && cls.status.event_type === 'Down') ipStatusClass = 'ip-card-down';
-                        else if (cls.status && cls.status.event_type === 'Available') ipStatusClass = 'ip-card-available';
+                        // First check for individual IP status
+                        // Note: cls.ip_statuses should be provided by backend if we want to be efficient
+                        // For now we'll assume the status logic handles it or we'll need to fetch
+                        // However, based on the user request, we should check if the individual IP has an event
+                        
+                        // We need to find if there's an event for this specific IP
+                        // This would require the backend to send IP statuses. 
+                        // Let's check how get_latest_status is used.
+                        
+                        // For now, let's use the class status as fallback but allow individual colors
+                        // if we had that data. Since we don't have per-IP status in 'servers' API yet,
+                        // I'll update the backend to include it.
+                        
+                        if (cls.ip_statuses && cls.ip_statuses[ip]) {
+                            const type = cls.ip_statuses[ip].event_type;
+                            if (type === 'Down') ipStatusClass = 'ip-card-down';
+                            else if (type === 'Available') ipStatusClass = 'ip-card-available';
+                        } else if (cls.status && cls.status.event_type === 'Down') {
+                            ipStatusClass = 'ip-card-down';
+                        } else if (cls.status && cls.status.event_type === 'Available') {
+                            ipStatusClass = 'ip-card-available';
+                        }
                         
                         return `
                         <span class="ip-pill inline-flex items-center ${ipStatusClass || 'bg-gray-50 text-gray-600'} px-2 py-0.5 rounded-md border border-gray-150">
@@ -418,23 +438,26 @@
             if(data.success){toast(data.message,'success');loadServers();}else toast(data.message||data.error,'error');
         }
 
-        function showGenerateIPsModal(serverName) {
-            const srv = serversData[serverName];
-            const cidrs = Object.keys(srv.classes).sort();
+        function showGenerateIPsModal(currentServerName) {
+            const names = Object.keys(serversData).sort();
             
             showModal(`
                 <div class="p-5">
                     <h3 class="text-base font-semibold text-gray-800 mb-4"><i class="fas fa-magic text-emerald-500 mr-2"></i>Generate Random IPs</h3>
-                    <p class="text-xs text-gray-500 mb-3">Server: <strong>${serverName}</strong></p>
                     
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Select Classes</label>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Select Servers</label>
                     <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50 mb-3">
-                        ${cidrs.map(c => `
+                        ${names.map(n => `
                             <label class="flex items-center gap-2 px-1 py-0.5 hover:bg-white rounded cursor-pointer">
-                                <input type="checkbox" name="m-gen-cidrs" value="${c}" checked class="rounded text-emerald-600">
-                                <span class="text-xs font-mono">${c}</span>
+                                <input type="checkbox" name="m-gen-servers" value="${n}" ${n===currentServerName?'checked':''} onchange="updateGenCidrs()">
+                                <span class="text-xs font-medium">${n}</span>
                             </label>
                         `).join('')}
+                    </div>
+
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Select Classes</label>
+                    <div id="m-gen-cidrs-container" class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50 mb-3">
+                        <!-- Populated by JS -->
                     </div>
 
                     <div class="grid grid-cols-2 gap-3 mb-3">
@@ -462,18 +485,45 @@
 
                     <div class="flex justify-end gap-2">
                         <button onclick="closeModal()" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm">Close</button>
-                        <button id="m-gen-btn" onclick="generateIPs('${esc(serverName)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Get Random IPs</button>
+                        <button id="m-gen-btn" onclick="generateIPs()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Get Random IPs</button>
                     </div>
                 </div>
             `);
+            updateGenCidrs();
         }
 
-        async function generateIPs(serverName) {
+        function updateGenCidrs() {
+            const selectedServers = Array.from(document.querySelectorAll('input[name="m-gen-servers"]:checked')).map(cb => cb.value);
+            const container = document.getElementById('m-gen-cidrs-container');
+            const allCidrs = new Set();
+            selectedServers.forEach(s => {
+                if (serversData[s]) {
+                    Object.keys(serversData[s].classes).forEach(c => allCidrs.add(c));
+                }
+            });
+            const sortedCidrs = Array.from(allCidrs).sort();
+            
+            if (sortedCidrs.length === 0) {
+                container.innerHTML = '<p class="text-[10px] text-gray-400 italic">No classes found</p>';
+                return;
+            }
+            
+            container.innerHTML = sortedCidrs.map(c => `
+                <label class="flex items-center gap-2 px-1 py-0.5 hover:bg-white rounded cursor-pointer">
+                    <input type="checkbox" name="m-gen-cidrs" value="${c}" checked class="rounded text-emerald-600">
+                    <span class="text-xs font-mono">${c}</span>
+                </label>
+            `).join('');
+        }
+
+        async function generateIPs() {
+            const selectedServers = Array.from(document.querySelectorAll('input[name="m-gen-servers"]:checked')).map(cb => cb.value);
             const selectedCidrs = Array.from(document.querySelectorAll('input[name="m-gen-cidrs"]:checked')).map(cb => cb.value);
             const from = parseInt(document.getElementById('m-gen-from').value);
             const to = parseInt(document.getElementById('m-gen-to').value);
             const filter = document.getElementById('m-gen-filter').value;
 
+            if (selectedServers.length === 0) { toast('Select at least one server.', 'error'); return; }
             if (selectedCidrs.length === 0) { toast('Select at least one class.', 'error'); return; }
             if (isNaN(from) || isNaN(to) || from > to) { toast('Invalid range.', 'error'); return; }
 
@@ -484,7 +534,7 @@
                 const res = await fetch('/api/ip-checker/ips/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ server: serverName, cidrs: selectedCidrs, from, to, filter })
+                    body: JSON.stringify({ servers: selectedServers, cidrs: selectedCidrs, from, to, filter })
                 });
                 const data = await res.json();
                 btn.disabled = false; btn.innerHTML = 'Get Random IPs';

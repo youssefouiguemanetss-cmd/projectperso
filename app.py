@@ -3488,8 +3488,12 @@ def api_generate_ips():
     if not current_user.has_ips_cheker_permission:
         return jsonify({'error': 'Unauthorized'}), 403
     data = request.json
+    servers = data.get('servers', [])
+    if not servers and data.get('server'):
+        servers = [data.get('server')]
+    
     success, msg, output = ip_checker.generate_random_ips(
-        data.get('server'),
+        servers,
         data.get('cidrs', []),
         data.get('from', 1),
         data.get('to', 100),
@@ -3519,8 +3523,17 @@ def ip_checker_servers():
         classes = {}
         for cidr, cdata in sdata['classes'].items():
             class_status = ip_checker.get_latest_status(sname, cidr)
+            
+            # Efficiently fetch statuses for all IPs in this class
+            ip_statuses = {}
+            for ip in cdata['ips']:
+                ip_status = ip_checker.get_latest_status(sname, cidr, ip)
+                if ip_status:
+                    ip_statuses[ip] = ip_status
+                    
             classes[cidr] = {
                 'ips': cdata['ips'],
+                'ip_statuses': ip_statuses,
                 'ip_count': len(cdata['ips']),
                 'created_at': cdata.get('created_at', ''),
                 'status': class_status
