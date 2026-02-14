@@ -1,5 +1,15 @@
 [
   {
+    "id": "evt_20260215003354278283",
+    "server": "dany_tss1_40",
+    "event_type": "Available",
+    "scope": "class",
+    "cidr": "154.29.64.0/24",
+    "ips": [],
+    "declared_by": "Youssef Ouiguemane",
+    "timestamp": "2026-02-15T00:33:54.278283"
+  },
+  {
     "id": "evt_20260214230520127779",
     "server": "dany_tss1_41",
     "event_type": "Available",
