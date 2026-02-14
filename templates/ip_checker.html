@@ -12,9 +12,12 @@
         .server-card { transition: all 0.25s ease; }
         .server-card:hover { box-shadow: 0 4px 20px rgba(37,99,235,0.1); }
         .status-available { color: #059669; background: #d1fae5; }
-        .status-down { color: #dc2626; background: #fee2e2; }
+        .status-down { color: #ffffff; background: #dc2626; }
         .status-custom { color: #2563eb; background: #dbeafe; }
         .status-none { color: #9ca3af; background: #f3f4f6; }
+        .ip-card-available { background-color: #d1fae5 !important; color: #059669 !important; border-color: #a7f3d0 !important; }
+        .ip-card-down { background-color: #fee2e2 !important; color: #dc2626 !important; border-color: #fecaca !important; }
+        .class-card-down { background-color: #fee2e2 !important; border-color: #fecaca !important; }
         .fade-in { animation: fadeIn 0.25s ease; }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .modal-bg { background: rgba(15,23,42,0.4); backdrop-filter: blur(4px); }
@@ -167,9 +170,16 @@
         function renderServer(name, srv) {
             const cidrs = Object.keys(srv.classes).sort();
             const totalIPs = cidrs.reduce((s,c)=>s+srv.classes[c].ip_count, 0);
+            
+            // Check if server status is Down
+            const isServerDown = srv.status && srv.status.event_type === 'Down';
+            const serverBgClass = isServerDown ? 'bg-red-50' : 'bg-white';
 
             const manageBtns = CAN_MANAGE ? `
                 <div class="flex items-center gap-1">
+                    <button onclick="showGenerateIPsModal('${esc(name)}')" class="p-1.5 rounded-md text-emerald-500 hover:bg-emerald-50 transition-colors" title="Generate IPs">
+                        <i class="fas fa-magic text-xs"></i>
+                    </button>
                     <button onclick="showAddClassToServerModal('${esc(name)}')" class="p-1.5 rounded-md text-blue-500 hover:bg-blue-50 transition-colors" title="Add Class">
                         <i class="fas fa-plus text-xs"></i>
                     </button>
@@ -184,7 +194,7 @@
                     </button>
                 </div>` : '';
 
-            return `<div class="server-card bg-white rounded-xl border border-gray-100 shadow-sm mb-4 overflow-hidden fade-in">
+            return `<div class="server-card ${serverBgClass} rounded-xl border border-gray-100 shadow-sm mb-4 overflow-hidden fade-in">
                 <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
                     <div class="flex items-center gap-3">
                         <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
@@ -210,6 +220,10 @@
             const key = serverName + '|' + cidr;
             const isExpanded = expandedClasses.has(key);
             const ipCount = cls.ip_count;
+            
+            // Check if class status is Down
+            const isClassDown = cls.status && cls.status.event_type === 'Down';
+            const classCardClass = isClassDown ? 'class-card-down' : 'bg-gray-50/70';
 
             const manageBtns = CAN_MANAGE ? `
                 <div class="flex items-center gap-1 ml-auto">
@@ -226,14 +240,20 @@
 
             const ipsSection = isExpanded && ipCount > 0 ? `
                 <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-1">
-                    ${cls.ips.map(ip => `
-                        <span class="ip-pill inline-flex items-center bg-gray-50 text-gray-600 px-2 py-0.5 rounded-md border border-gray-150">
+                    ${cls.ips.map(ip => {
+                        let ipStatusClass = '';
+                        if (cls.status && cls.status.event_type === 'Down') ipStatusClass = 'ip-card-down';
+                        else if (cls.status && cls.status.event_type === 'Available') ipStatusClass = 'ip-card-available';
+                        
+                        return `
+                        <span class="ip-pill inline-flex items-center ${ipStatusClass || 'bg-gray-50 text-gray-600'} px-2 py-0.5 rounded-md border border-gray-150">
                             ${ip}
                             ${CAN_MANAGE ? `<button onclick="deleteIP('${esc(serverName)}','${esc(cidr)}','${ip}')" class="ml-1 text-red-300 hover:text-red-500 text-[9px]"><i class="fas fa-times"></i></button>` : ''}
-                        </span>`).join('')}
+                        </span>`;
+                    }).join('')}
                 </div>` : '';
 
-            return `<div class="bg-gray-50/70 rounded-lg p-3 border border-gray-100/80">
+            return `<div class="${classCardClass} rounded-lg p-3 border border-gray-100/80">
                 <div class="flex items-center gap-2">
                     <button onclick="toggleIPs('${esc(serverName)}','${esc(cidr)}')" class="expand-btn ${isExpanded?'open':''} text-gray-400 hover:text-gray-600 p-0.5" title="${isExpanded?'Collapse':'Expand'}">
                         <i class="fas fa-chevron-down text-[10px]"></i>
@@ -396,6 +416,99 @@
             const res=await fetch('/api/ip-checker/ip/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({server,cidr,ip})});
             const data=await res.json();
             if(data.success){toast(data.message,'success');loadServers();}else toast(data.message||data.error,'error');
+        }
+
+        function showGenerateIPsModal(serverName) {
+            const srv = serversData[serverName];
+            const cidrs = Object.keys(srv.classes).sort();
+            
+            showModal(`
+                <div class="p-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-4"><i class="fas fa-magic text-emerald-500 mr-2"></i>Generate Random IPs</h3>
+                    <p class="text-xs text-gray-500 mb-3">Server: <strong>${serverName}</strong></p>
+                    
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Select Classes</label>
+                    <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50 mb-3">
+                        ${cidrs.map(c => `
+                            <label class="flex items-center gap-2 px-1 py-0.5 hover:bg-white rounded cursor-pointer">
+                                <input type="checkbox" name="m-gen-cidrs" value="${c}" checked class="rounded text-emerald-600">
+                                <span class="text-xs font-mono">${c}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
+                            <input id="m-gen-from" type="number" value="1" min="1" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-400 bg-gray-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">To</label>
+                            <input id="m-gen-to" type="number" value="100" min="1" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-400 bg-gray-50">
+                        </div>
+                    </div>
+
+                    <label class="block text-xs font-medium text-gray-600 mb-1">IP Filter</label>
+                    <select id="m-gen-filter" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-4 focus:ring-2 focus:ring-emerald-400 bg-gray-50">
+                        <option value="all">All Registered IPs</option>
+                        <option value="Available">Only Available</option>
+                        <option value="Down">Only Down</option>
+                    </select>
+
+                    <div id="m-gen-output-container" class="hidden mb-4">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Output (Copied!)</label>
+                        <textarea id="m-gen-output" rows="5" readonly class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-gray-100 resize-none"></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm">Close</button>
+                        <button id="m-gen-btn" onclick="generateIPs('${esc(serverName)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Get Random IPs</button>
+                    </div>
+                </div>
+            `);
+        }
+
+        async function generateIPs(serverName) {
+            const selectedCidrs = Array.from(document.querySelectorAll('input[name="m-gen-cidrs"]:checked')).map(cb => cb.value);
+            const from = parseInt(document.getElementById('m-gen-from').value);
+            const to = parseInt(document.getElementById('m-gen-to').value);
+            const filter = document.getElementById('m-gen-filter').value;
+
+            if (selectedCidrs.length === 0) { toast('Select at least one class.', 'error'); return; }
+            if (isNaN(from) || isNaN(to) || from > to) { toast('Invalid range.', 'error'); return; }
+
+            const btn = document.getElementById('m-gen-btn');
+            btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Generating...';
+
+            try {
+                const res = await fetch('/api/ip-checker/ips/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ server: serverName, cidrs: selectedCidrs, from, to, filter })
+                });
+                const data = await res.json();
+                btn.disabled = false; btn.innerHTML = 'Get Random IPs';
+
+                if (data.success) {
+                    const output = document.getElementById('m-gen-output');
+                    const container = document.getElementById('m-gen-output-container');
+                    output.value = data.output;
+                    container.classList.remove('hidden');
+                    
+                    output.select();
+                    try {
+                        await navigator.clipboard.writeText(data.output);
+                        toast('Generated IPs copied to clipboard!', 'success');
+                    } catch(err) {
+                        toast('Generated successfully, please copy from the box.', 'info');
+                    }
+                } else {
+                    toast(data.message || data.error, 'error');
+                }
+            } catch (e) {
+                btn.disabled = false; btn.innerHTML = 'Get Random IPs';
+                toast('Failed to generate IPs.', 'error');
+            }
         }
 
         async function showDeclareEventModal(server, cidr) {

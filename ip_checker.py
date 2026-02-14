@@ -352,30 +352,48 @@ def get_latest_status(server_name, cidr=None, ip_str=None):
     return None
 
 
-def search_ip(ip_str):
-    if not validate_ip_format(ip_str):
-        return False, f"'{ip_str}' is not a valid IP address.", []
+import random
 
+def generate_random_ips(server_name, selected_cidrs, from_idx, to_idx, filter_type='all'):
     data = load_servers()
-    events = load_events()
-    results = []
+    if server_name not in data:
+        return False, f"Server '{server_name}' not found.", ""
 
-    for server_name, server_data in data.items():
-        for cidr, cls in server_data['classes'].items():
-            if ip_str in cls['ips']:
-                status = get_latest_status(server_name, cidr, ip_str)
-                results.append({
-                    'server': server_name,
-                    'cidr': cidr,
-                    'status': status,
-                    'registered': True
-                })
-            elif validate_ip_in_cidr(ip_str, cidr):
-                results.append({
-                    'server': server_name,
-                    'cidr': cidr,
-                    'status': None,
-                    'registered': False
-                })
+    all_matching_ips = []
+    server_data = data[server_name]
 
-    return True, f"Found {len(results)} match(es).", results
+    for cidr in selected_cidrs:
+        if cidr not in server_data['classes']:
+            continue
+        
+        cls = server_data['classes'][cidr]
+        ips = cls['ips']
+        
+        if filter_type != 'all':
+            filtered = []
+            for ip in ips:
+                status = get_latest_status(server_name, cidr, ip)
+                status_type = status['event_type'] if status else 'Available'
+                if status_type == filter_type:
+                    filtered.append(ip)
+            ips = filtered
+            
+        all_matching_ips.extend(ips)
+
+    if not all_matching_ips:
+        return False, "No IPs found matching the criteria.", ""
+
+    # Sort to ensure predictable order
+    all_matching_ips.sort()
+    unique_count = len(all_matching_ips)
+    
+    total_requested = (to_idx - from_idx) + 1
+    result_ips = []
+    
+    for i in range(total_requested):
+        # Cycle through IPs if requested more than unique count
+        ip = all_matching_ips[i % unique_count]
+        idx = from_idx + i
+        result_ips.append(f"{idx}#{ip}:92")
+
+    return True, "Success", "\n".join(result_ips)
