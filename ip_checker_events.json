@@ -1,0 +1,58 @@
+[
+  {
+    "id": "evt_20260213103135047477",
+    "server": "dany_tss1_40",
+    "event_type": "Down",
+    "scope": "ip",
+    "cidr": null,
+    "ips": [
+      "154.29.64.147"
+    ],
+    "declared_by": "Redouan El Arras",
+    "timestamp": "2026-02-13T10:31:35.047491"
+  },
+  {
+    "id": "evt_20260213102739771213",
+    "server": "dany_tss1_40",
+    "event_type": "Available",
+    "scope": "ip",
+    "cidr": null,
+    "ips": [
+      "154.29.64.15"
+    ],
+    "declared_by": "Redouan El Arras",
+    "timestamp": "2026-02-13T10:27:39.771229"
+  },
+  {
+    "id": "evt_20260213102703273775",
+    "server": "dany_tss1_40",
+    "event_type": "Down",
+    "scope": "ip",
+    "cidr": null,
+    "ips": [
+      "154.29.64.15"
+    ],
+    "declared_by": "Redouan El Arras",
+    "timestamp": "2026-02-13T10:27:03.273790"
+  },
+  {
+    "id": "evt_20260213094053188011",
+    "server": "dany_tss1_41",
+    "event_type": "Down",
+    "scope": "server",
+    "cidr": null,
+    "ips": [],
+    "declared_by": "Youssef Ouiguemane",
+    "timestamp": "2026-02-13T09:40:53.188024"
+  },
+  {
+    "id": "evt_20260213093700547769",
+    "server": "dany_tss1_40",
+    "event_type": "Available",
+    "scope": "server",
+    "cidr": null,
+    "ips": [],
+    "declared_by": "Youssef Ouiguemane",
+    "timestamp": "2026-02-13T09:37:00.547785"
+  }
+]

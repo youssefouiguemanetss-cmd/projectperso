@@ -1,0 +1,26 @@
+{
+  "omar_eloutmani": {
+    "max_processes": 1,
+    "domain_quota": 0,
+    "domains_processed_this_month": 0,
+    "quota_month": "2026-02"
+  },
+  "redouan": {
+    "max_processes": 1,
+    "domain_quota": 0,
+    "domains_processed_this_month": 0,
+    "quota_month": "2026-02"
+  },
+  "F.Hassan": {
+    "max_processes": 1,
+    "domain_quota": 0,
+    "domains_processed_this_month": 0,
+    "quota_month": "2026-02"
+  },
+  "y.ouiguemane": {
+    "max_processes": 1,
+    "domain_quota": 0,
+    "domains_processed_this_month": 0,
+    "quota_month": "2026-02"
+  }
+}
