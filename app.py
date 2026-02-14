@@ -3481,6 +3481,23 @@ def news_subscription_successful_domains():
     return jsonify({'domains': domains, 'total': len(domains)})
 
 
+
+@app.route('/api/ip-checker/ips/generate', methods=['POST'])
+@login_required
+def api_generate_ips():
+    if not current_user.has_ips_cheker_permission:
+        return jsonify({'error': 'Unauthorized'}), 403
+    data = request.json
+    success, msg, output = ip_checker.generate_random_ips(
+        data.get('server'),
+        data.get('cidrs', []),
+        data.get('from', 1),
+        data.get('to', 100),
+        data.get('filter', 'all')
+    )
+    return jsonify({'success': success, 'message': msg, 'output': output})
+
+
 @app.route('/ip-checker')
 @login_required
 def ip_checker_page():
